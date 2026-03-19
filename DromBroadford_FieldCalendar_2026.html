@@ -617,8 +617,6 @@ async function loadBookings() {
   const data = await supaFetch("GET", "bookings?select=*&order=submitted_at.asc");
   if (data) userBookings = data.map(dbToLocal);
   showLoader(false);
-  renderMini();
-  renderDayView();
 }
 
 function showLoader(on) {
@@ -810,8 +808,12 @@ async function adminDel(id){
   renderAdminPanel(); renderDayView(); renderMini();
   await supaFetch("DELETE","bookings?id=eq."+id);
 }
+// Set mini calendar to current month before loading
+miniYear  = today.getFullYear();
+miniMonth = today.getMonth();
 // Load bookings from Supabase, then render
 loadBookings().then(() => {
+  renderMini();
   selectDate(todayStr);
 });
 </script>
