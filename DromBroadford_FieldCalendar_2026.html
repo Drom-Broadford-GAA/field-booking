@@ -808,13 +808,16 @@ async function adminDel(id){
   renderAdminPanel(); renderDayView(); renderMini();
   await supaFetch("DELETE","bookings?id=eq."+id);
 }
-// Set mini calendar to current month before loading
+// Set mini calendar to current month
 miniYear  = today.getFullYear();
 miniMonth = today.getMonth();
-// Load bookings from Supabase, then render
+// Render calendar immediately (don't wait for Supabase)
+renderMini();
+selectDate(todayStr);
+// Then load bookings from Supabase in the background and refresh
 loadBookings().then(() => {
   renderMini();
-  selectDate(todayStr);
+  if (activeDate) renderDayView();
 });
 </script>
 </body>
