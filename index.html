@@ -1134,30 +1134,9 @@ function renderAdminPanel(showForm) {
   });
 }
 
-function toggleAdminCustomTime() {
-  const cb = document.getElementById("abCustomTime");
-  const fields = document.getElementById("abCustomTimeFields");
-  const slotRow = document.getElementById("abSlot");
-  if (!cb || !fields || !slotRow) return;
-  fields.style.display = cb.checked ? "block" : "none";
-  if (slotRow) slotRow.parentElement.style.opacity = cb.checked ? "0.4" : "1";
-}
+function toggleAdminCustomTime() { /* no-op — admin always uses time pickers */ }
 
-function refreshAbSlots() {
-  const dateEl = document.getElementById("abDate");
-  const slotEl = document.getElementById("abSlot");
-  if (!dateEl || !slotEl) return;
-  const date = dateEl.value;
-  if (!date) { slotEl.innerHTML = "<option value=''>Select date first</option>"; return; }
-  const [y,m,d] = date.split("-").map(Number);
-  const day = new Date(y,m-1,d).getDay();
-  const slots = (day===0||day===6) ? WEEKEND_SLOTS : WEEKDAY_SLOTS;
-  slotEl.innerHTML = slots.map(s => `<option value="${s.start}">${s.startLabel} - ${s.endLabel}</option>`).join("");
-}
-
-
-let adminBookHalf = "full";
-let adminBookingDate = null;
+function refreshAbSlots() { /* no-op — using time pickers */ }
 
 function adminSelectHalf(h) {
   adminBookHalf = h;
@@ -1198,11 +1177,8 @@ function updateAdminHalfNote() {
 
 async function submitAdminBooking() {
   const date  = (document.getElementById("abDate")||{value:""}).value;
-  const isCustomTime = document.getElementById("abCustomTime") && document.getElementById("abCustomTime").checked;
-  const slot  = isCustomTime
-    ? (document.getElementById("abStartTime")||{value:""}).value
-    : (document.getElementById("abSlot")||{value:""}).value;
-  const customEnd = isCustomTime ? (document.getElementById("abEndTime")||{value:""}).value : null;
+  const slot    = (document.getElementById("abStartTime")||{value:""}).value;
+  const customEnd = (document.getElementById("abEndTime")||{value:""}).value;
   const pitch = (document.getElementById("abPitch")||{value:""}).value;
   const team  = (document.getElementById("abTeam")||{value:""}).value.trim();
   const coach = (document.getElementById("abCoach")||{value:""}).value.trim();
