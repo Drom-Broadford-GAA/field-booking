@@ -311,6 +311,8 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
   .booking-form{padding:14px;}
   .form-title{font-size:14px;}
   .form-row{flex-direction:column;gap:8px;}
+  .booking-form .form-row > div { width:100%; }
+  .booking-form div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns:1fr !important; }
   .half-selector{gap:6px;}
   .half-opt{padding:7px;font-size:11px;}
   .form-actions{flex-direction:column;}
@@ -660,7 +662,8 @@ function renderDayView() {
   document.getElementById("dayTitle").innerHTML = "<em>"+dayName+"</em>, "+d+" "+MONTHS[m-1]+" "+y;
   const [sy,sm,sd] = activeDate.split("-").map(Number);
   const isWknd = new Date(sy,sm-1,sd).getDay()===0 || new Date(sy,sm-1,sd).getDay()===6;
-  document.getElementById("daySubtitle").textContent = (activeDate===todayStr ? "Today  -  " : "") + (isWknd ? "Weekend: 7am - 10pm" : "Weekday: 5pm - 10pm");
+  const prefix = activeDate===todayStr ? "Today  —  " : "";
+  document.getElementById("daySubtitle").textContent = prefix + (isWknd ? "Weekend: 7am – 10pm" : "Weekday: 5pm – 10pm");
   document.getElementById("dayNavBtns").style.display = "flex";
 
 
@@ -902,7 +905,13 @@ async function submitBooking(){
     await supaFetch("POST","bookings",[row]);
   }
 
-  // Single admin email listing all dates
+  // Show success for single booking
+  if(weeks===1 && allBks.length===1){
+    alert("Booking request submitted!\n\n" + dateLabel(allBks[0].date) + " — " + fmt12(allBks[0].slot) + " to " + fmt12(allBks[0].slotEnd) + "\n" + allBks[0].pitch + " · " + (allBks[0].half==="full"?"Full pitch":"Half pitch") + "\n\nAdmin will review your request and you will receive a confirmation email.");
+    return;
+  }
+
+  // Single admin email listing all dates (recurring)
   const dateList=allBks.map(b=>dateLabel(b.date)).join(", ");
   const skippedMsg=skippedDates.length>0?" ("+skippedDates.length+" week"+(skippedDates.length>1?"s":"")+" skipped — already booked)":"";
   await notifyAdminRecurring(allBks[0], dateList, skippedMsg);
