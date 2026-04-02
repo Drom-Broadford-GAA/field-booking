@@ -811,6 +811,59 @@ function buildBookingForm(){
   return wrap;
 }
 
+function updateHalfAvail() {
+  const pitchEl = document.getElementById("fPitch");
+  const halfSelector = document.getElementById("halfSelector");
+  const halfLabel = document.getElementById("halfLabel");
+  if (!pitchEl || !halfSelector) return;
+  const pitch = pitchEl.value;
+  if (pitch === "Dromcollogher") {
+    halfSelector.style.display = "none";
+    if (halfLabel) halfLabel.textContent = "Full pitch only";
+    selectedHalf = "full";
+    const fullOpt = document.getElementById("halfFull");
+    const halfOpt = document.getElementById("halfHalf");
+    if (fullOpt) { fullOpt.classList.add("selected"); fullOpt.classList.remove("disabled"); }
+    if (halfOpt) halfOpt.classList.remove("selected");
+  } else {
+    halfSelector.style.display = "grid";
+    if (halfLabel) halfLabel.textContent = "";
+  }
+}
+
+
+function updateHalfNote() {
+  if (!activeDate || !activeSlot) return;
+  const pitchEl = document.getElementById("fPitch");
+  if (!pitchEl) return;
+  const pitch = pitchEl.value;
+  const booked = halvesBooked(activeDate, activeSlot, pitch);
+  const halfLeft = 2 - booked;
+  const note = document.getElementById("halfAvailNote");
+  if (!note) return;
+  if (halfLeft === 2) { note.textContent = pitch+": Both halves available"; note.style.color="var(--green)"; }
+  else if (halfLeft === 1) { note.textContent = pitch+": 1 half already booked - 1 half remaining"; note.style.color="var(--amber)"; }
+  else { note.textContent = pitch+": Fully booked"; note.style.color="var(--red)"; }
+
+  // Disable full pitch if only 1 half left
+  const fullOpt = document.getElementById("halfFull");
+  if (fullOpt) {
+    if (halfLeft < 2) { fullOpt.classList.add("disabled"); if(selectedHalf==="full"){ selectedHalf="half"; fullOpt.classList.remove("selected"); document.getElementById("halfHalf").classList.add("selected"); } }
+    else { fullOpt.classList.remove("disabled"); }
+  }
+}
+
+
+function selectHalf(h) {
+  selectedHalf = h;
+  const full = document.getElementById("halfFull");
+  const half = document.getElementById("halfHalf");
+  if (full) full.classList.toggle("selected", h==="full");
+  if (half) half.classList.toggle("selected", h==="half");
+  updateHalfNote();
+}
+
+
 function updateEndTimeOpts(){
   const s=document.getElementById("fStartTime"),e=document.getElementById("fEndTime");
   if(!s||!e) return;
