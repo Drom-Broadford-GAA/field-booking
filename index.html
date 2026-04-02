@@ -117,6 +117,10 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 .bk-del{background:none;border:none;cursor:pointer;font-size:14px;color:var(--red);opacity:.35;padding:0 2px;flex-shrink:0;transition:opacity .15s;}
 .bk-del:hover{opacity:1;}
 
+.half-full-only{padding:9px 12px;background:var(--cream2);border-radius:7px;font-size:12px;font-weight:600;color:var(--text2);display:none;}
+
+.half-full-only{padding:9px 12px;background:var(--cream2);border-radius:7px;font-size:12px;font-weight:600;color:var(--text2);display:none;margin-top:2px;}
+
 /* BOOK / NOTIFY BUTTONS */
 .book-slot-btn{background:none;border:1px dashed var(--cream3);border-radius:7px;color:var(--text3);font-size:11px;padding:9px 13px;cursor:pointer;text-align:left;width:100%;font-family:'Outfit',sans-serif;transition:all .15s;}
 .book-slot-btn:hover{border-color:var(--amber2);color:var(--amber);background:var(--amber-pale);}
@@ -722,7 +726,7 @@ function renderDayView() {
         card.style.background = b.status==="approved" ? "#edfaf3" : "#fff8eb";
         card.style.borderColor = b.status==="approved" ? "#b8e8ce" : "#fde9b8";
         const badge = b.status==="approved" ? "<span class='badge-approved'>Approved</span>" : "<span class='badge-pending'>Pending</span>";
-        card.innerHTML = "<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong> <span style='opacity:.6;font-size:11px;'>"+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</span> "+badge+"</span><button class='bk-del' onclick='delBooking(\""+b.id+"\")' title='Delete'>&#215;</button>";
+        card.innerHTML = "<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong> <span style='opacity:.6;font-size:11px;'>"+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</span> "+badge+"</span>";
         cCol.appendChild(card);
       });
 
@@ -768,7 +772,7 @@ function buildBookingForm(slot) {
 
   const pitchOptsHtml = pitchOptions.length > 0
     ? pitchOptions.map(p =>
-        "<option value='"+p.pitch+"'>"+p.pitch+" ("+p.halfLeft+" half"+(p.halfLeft===2?"es":"")+" available)</option>"
+        "<option value='"+p.pitch+"'>"+p.pitch+"</option>"
       ).join("")
     : "<option value=''>No pitches available today</option>";
 
@@ -784,10 +788,7 @@ function buildBookingForm(slot) {
     "</div>" +
     "<div class='form-row'>" +
       "<div class='form-field'><label>Pitch</label><select id='fPitch'>"+pitchOptsHtml+"</select></div>" +
-      "<div class='form-field'><label>Full Pitch or Half Pitch</label><div class='half-selector' id='halfSelector'>" +
-        "<div class='half-opt selected' id='halfFull' onclick='selectHalf(\"full\")'>Full Pitch</div>" +
-        "<div class='half-opt' id='halfHalf' onclick='selectHalf(\"half\")'>Half Pitch</div>" +
-      "</div></div>" +
+      "<div class=\'form-field\'><label>Full or Half Pitch</label><div class=\'half-selector\' id=\'halfSelector\'><div class=\'half-opt selected\' id=\'halfFull\' onclick=\'selectHalf('full')\'> Full Pitch</div><div class=\'half-opt\' id=\'halfHalf\' onclick=\'selectHalf('half')\'>Half Pitch</div></div></div>" +
     "</div>" +
     "<div id='halfAvailNote' style='font-size:11px;color:var(--amber);margin-top:-4px;margin-bottom:8px;'></div>" +
     "<div class=\'recurring-section\'>" +
@@ -809,6 +810,14 @@ function buildBookingForm(slot) {
     const pitchSel = document.getElementById("fPitch");
     if (pitchSel) {
       pitchSel.addEventListener("change", () => { updateHalfAvail(); updateHalfNote(); });
+      const halfSel = document.getElementById("halfSelector");
+      if (halfSel && !document.getElementById("halfFullOnly")) {
+        const lbl = document.createElement("div");
+        lbl.id = "halfFullOnly";
+        lbl.className = "half-full-only";
+        lbl.textContent = "Full Pitch Only";
+        halfSel.parentNode.insertBefore(lbl, halfSel.nextSibling);
+      }
       updateHalfAvail();
       updateHalfNote();
     }
@@ -830,20 +839,16 @@ function selectHalf(h) {
 function updateHalfAvail() {
   const pitchEl = document.getElementById("fPitch");
   const halfSelector = document.getElementById("halfSelector");
-  const halfLabel = document.getElementById("halfLabel");
+  const halfFullOnly = document.getElementById("halfFullOnly");
   if (!pitchEl || !halfSelector) return;
   const pitch = pitchEl.value;
   if (pitch === "Dromcollogher") {
     halfSelector.style.display = "none";
-    if (halfLabel) halfLabel.textContent = "Full pitch only";
+    if (halfFullOnly) halfFullOnly.style.display = "block";
     selectedHalf = "full";
-    const fullOpt = document.getElementById("halfFull");
-    const halfOpt = document.getElementById("halfHalf");
-    if (fullOpt) { fullOpt.classList.add("selected"); fullOpt.classList.remove("disabled"); }
-    if (halfOpt) halfOpt.classList.remove("selected");
   } else {
     halfSelector.style.display = "grid";
-    if (halfLabel) halfLabel.textContent = "";
+    if (halfFullOnly) halfFullOnly.style.display = "none";
   }
 }
 
@@ -913,7 +918,7 @@ async function submitBooking(slotStart, slotEnd) {
   const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, contact:booking.phone, status:"pending" };
   const result = await supaFetch("POST","bookings",[row]);
   if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); renderDayView(); renderMini(); return; }
-  notifyAdmin(booking);
+  await await notifyAdmin(booking);
 }
 
 async function submitNotify(slotStart) {
