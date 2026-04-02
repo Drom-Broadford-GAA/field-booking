@@ -406,7 +406,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
         <button class="summary-filter active" onclick="setSummaryFilter('all',this)">All Pitches</button>
         <button class="summary-filter" onclick="setSummaryFilter('Dromcollogher',this)">Dromcollogher</button>
         <button class="summary-filter" onclick="setSummaryFilter('Tullylease',this)">Tullylease</button>
-        <button class="summary-filter" onclick="setSummaryFilter('Hazlewood',this)">Hazlewood</button>
+        
         <button class="btn btn-ghost btn-sm" style="background:var(--cream2);color:var(--text2);border-color:var(--border2);" onclick="window.print()">Print</button>
       </div>
     </div>
@@ -485,7 +485,7 @@ const today = new Date();
 const todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
 const ADMIN_EMAIL = "eoinbarry08@gmail.com";
 const ADMIN_PIN = "1916";
-const PITCHES = ["Dromcollogher","Tullylease","Hazlewood"];
+const PITCHES = ["Dromcollogher","Tullylease"];
 
 // 15-min time options
 function buildTimeOpts(sh,eh) {
@@ -727,7 +727,7 @@ function renderDayView() {
     const avSec=document.createElement("div"); avSec.style.cssText="padding:4px 28px;";
     const avRow=document.createElement("div"); avRow.className="pitch-avail";
     PITCHES.forEach(pitch=>{
-      if(pitch==="Tullylease"&&activeDate===todayStr) return;
+      
       const pb=dBks.filter(b=>b.pitch===pitch);
       const bdg=document.createElement("span"); bdg.className=pb.length===0?"pitch-badge available":"pitch-badge half";
       bdg.textContent=pb.length===0?"✓ "+pitch+(pitch==="Dromcollogher"?" (full pitch)":""):"◑ "+pitch+": "+pb.length+" booking"+(pb.length>1?"s":"");
@@ -776,8 +776,7 @@ function buildBookingForm(){
         <label>Pitch</label>
         <select id="fPitch" onchange="updateHalfAvail();updateHalfNote();">
           <option value="Dromcollogher">Dromcollogher</option>
-          ${activeDate===todayStr?"":'<option value="Tullylease">Tullylease</option>'}
-          <option value="Hazlewood">Hazlewood</option>
+          <option value="Tullylease">Tullylease</option>
         </select>
       </div>
       <div class="form-field"><label>Full or Half Pitch</label>
@@ -785,7 +784,6 @@ function buildBookingForm(){
           <div class="half-opt selected" id="halfFull" onclick="selectHalf('full')">Full Pitch</div>
           <div class="half-opt" id="halfHalf" onclick="selectHalf('half')">Half Pitch</div>
         </div>
-        <div id="halfFullOnly" class="half-full-only">Full Pitch Only</div>
       </div>
     </div>
     <div id="halfAvailNote" style="font-size:11px;color:var(--amber);margin-top:-4px;margin-bottom:8px;"></div>
@@ -812,23 +810,10 @@ function buildBookingForm(){
 }
 
 function updateHalfAvail() {
-  const pitchEl = document.getElementById("fPitch");
   const halfSelector = document.getElementById("halfSelector");
-  const halfLabel = document.getElementById("halfLabel");
-  if (!pitchEl || !halfSelector) return;
-  const pitch = pitchEl.value;
-  if (pitch === "Dromcollogher") {
-    halfSelector.style.display = "none";
-    if (halfLabel) halfLabel.textContent = "Full pitch only";
-    selectedHalf = "full";
-    const fullOpt = document.getElementById("halfFull");
-    const halfOpt = document.getElementById("halfHalf");
-    if (fullOpt) { fullOpt.classList.add("selected"); fullOpt.classList.remove("disabled"); }
-    if (halfOpt) halfOpt.classList.remove("selected");
-  } else {
-    halfSelector.style.display = "grid";
-    if (halfLabel) halfLabel.textContent = "";
-  }
+  const halfFullOnly = document.getElementById("halfFullOnly");
+  if (halfSelector) halfSelector.style.display = "grid";
+  if (halfFullOnly) halfFullOnly.style.display = "none";
 }
 
 
@@ -911,7 +896,7 @@ async function submitBooking(){
   if(!coach){alert("Please enter the coach name.");return;}
   if(!email){alert("Please enter an email address.");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return;}
-  if(pitch==="Dromcollogher") selectedHalf="full";
+
   const over=bookings.filter(b=>b.date===activeDate&&b.pitch===pitch&&(b.status==="pending"||b.status==="approved")&&slotsOverlap(st,et,b.slot,b.slotEnd||et));
   if(over.length>0){
     const booked=over.reduce((s,b)=>s+(b.half==="full"?2:1),0);
@@ -1061,7 +1046,6 @@ function renderAdminPanel(showForm) {
           <select id="abPitch" onchange="updateAdminHalfNote()">
             <option value="Dromcollogher">Dromcollogher</option>
             <option value="Tullylease">Tullylease</option>
-            <option value="Hazlewood">Hazlewood</option>
           </select>
         </div>
         <div><label>Full or half pitch</label>
@@ -1180,7 +1164,7 @@ async function submitAdminBooking() {
     const endEl   = document.getElementById("abEndTime");
     if (startEl && endEl && startEl.value >= endEl.value) { alert("End time must be after start time."); return; }
   }
-  if (pitch==="Dromcollogher") adminBookHalf="full";
+
   const booked = halvesBooked(date, slot, pitch);
   const halfLeft = 2 - booked;
   if (adminBookHalf==="full" && halfLeft<2) { alert("Full pitch not available. Only "+halfLeft+" half(s) remaining."); return; }
@@ -1344,7 +1328,7 @@ function renderWeekView() {
         cell.appendChild(timeLabel);
 
         // Pitch dots
-        const pitchesToShow = PITCHES.filter(p => !(p==="Tullylease" && isToday2));
+        const pitchesToShow = PITCHES;
         pitchesToShow.forEach(pitch => {
           const booked = halvesBooked(ds, slot.start, pitch);
           const row = document.createElement("div");
