@@ -612,6 +612,12 @@ function loader(on) { document.getElementById("globalLoader").style.opacity = on
 function getHomeFixtures(d)  { return HOME_FIXTURES.filter(f => f.date===d); }
 function getAwayFixtures(d)  { return AWAY_FIXTURES.filter(f => f.date===d); }
 function getDayBookings(d)   { return bookings.filter(b => b.date===d && (b.status==="approved"||b.status==="pending")); }
+function timeToMins(t) {
+  if (!t) return 0;
+  const [h,m] = t.split(":").map(Number);
+  return h*60 + m;
+}
+
 function getDayBookings(d) {
   return bookings.filter(b=>b.date===d&&(b.status==="approved"||b.status==="pending")).sort((a,b)=>a.slot.localeCompare(b.slot));
 }
