@@ -758,11 +758,14 @@ function buildBookingForm(){
         <input type="checkbox" id="fRecurring" onchange="toggleRecurring()" style="width:16px;height:16px;"> Make this a recurring booking
       </label>
       <div id="recurringOpts" style="display:none;margin-top:8px;">
-        <select id="fWeeks" style="margin-top:4px;">
+        <label style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Number of weeks</label>
+        <select id="fWeeks" style="margin-top:0;">
           <option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option>
-          <option value="5">5 weeks</option><option value="6">6 weeks</option><option value="7">7 weeks</option><option value="8">8 weeks</option>
+          <option value="5">5 weeks</option><option value="6">6 weeks</option><option value="7">7 weeks</option>
+          <option value="8">8 weeks</option><option value="9">9 weeks</option><option value="10">10 weeks</option>
+          <option value="11">11 weeks</option><option value="12">12 weeks</option>
         </select>
-        <div style="font-size:10px;color:var(--amber);margin-top:4px;">Each week submitted as a separate booking request.</div>
+        <div style="font-size:10px;color:var(--amber);margin-top:4px;">Each week submitted as a separate pending request. Weeks already booked will be skipped.</div>
       </div>
     </div>
     <div style="font-size:11px;color:var(--text3);background:var(--cream2);border-radius:6px;padding:8px 10px;margin-bottom:10px;">Your request will be sent to admin for approval.</div>
@@ -854,6 +857,8 @@ async function submitBooking(){
   const email=(document.getElementById("fEmail")||{value:""}).value.trim();
   const phone=(document.getElementById("fPhone")||{value:""}).value.trim();
   const pitch=(document.getElementById("fPitch")||{value:""}).value;
+  const half=selectedHalf;
+
   if(!st||!et){alert("Please select a start and end time.");return;}
   const dur=timeToMins(et)-timeToMins(st);
   if(dur<60){const el=document.getElementById("timeError");if(el)el.style.display="block";alert("End time must be at least 1 hour after start time.");return;}
@@ -863,24 +868,50 @@ async function submitBooking(){
   if(!email){alert("Please enter an email address.");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return;}
 
+  // Check clash on first date
   const over=bookings.filter(b=>b.date===activeDate&&b.pitch===pitch&&(b.status==="pending"||b.status==="approved")&&slotsOverlap(st,et,b.slot,b.slotEnd||et));
   if(over.length>0){
     const booked=over.reduce((s,b)=>s+(b.half==="full"?2:1),0);
-    if(selectedHalf==="full"&&booked>0){alert("Full pitch is not available for this time on "+pitch+".");return;}
+    if(half==="full"&&booked>0){alert("Full pitch is not available for this time on "+pitch+".");return;}
     if(booked>=2){alert("This pitch is fully booked for the selected time.");return;}
   }
+
   const isRec=document.getElementById("fRecurring")&&document.getElementById("fRecurring").checked;
   const weeks=isRec?parseInt((document.getElementById("fWeeks")||{value:"1"}).value):1;
-  activeForm=null; selectedHalf="full"; renderDayView(); renderMini();
+
+  // Build list of dates - skip already booked weeks
+  const bookedDates=[], skippedDates=[];
   for(let w=0;w<weeks;w++){
     const bkDate=w===0?activeDate:addDays(activeDate,w*7);
-    const bk={id:Date.now().toString()+"_"+w,date:bkDate,slot:st,slotEnd:et,pitch,half:selectedHalf,team,coach,email,phone,status:"pending",submittedAt:new Date().toISOString()};
-    bookings.push(bk);
-    const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,contact:bk.phone,status:"pending"};
-    const res=await supaFetch("POST","bookings",[row]);
-    if(!res&&w===0){alert("Booking could not be saved. Please try again.");bookings=bookings.filter(b=>b.id!==bk.id);return;}
-    if(w===0) await notifyAdmin(bk);
+    const clash=bookings.filter(b=>b.date===bkDate&&b.pitch===pitch&&(b.status==="pending"||b.status==="approved")&&slotsOverlap(st,et,b.slot,b.slotEnd||et));
+    const taken=clash.reduce((s,b)=>s+(b.half==="full"?2:1),0);
+    if((half==="full"&&taken>0)||(taken>=2)){ skippedDates.push(bkDate); continue; }
+    bookedDates.push(bkDate);
   }
+  if(bookedDates.length===0){alert("No available slots found for any of the selected weeks.");return;}
+
+  activeForm=null; selectedHalf="full"; renderDayView(); renderMini();
+
+  // Submit all bookings
+  const allBks=[];
+  for(let i=0;i<bookedDates.length;i++){
+    const bkDate=bookedDates[i];
+    const bk={id:Date.now().toString()+"_"+i,date:bkDate,slot:st,slotEnd:et,pitch,half,team,coach,email,phone,status:"pending",submittedAt:new Date().toISOString()};
+    bookings.push(bk); allBks.push(bk);
+    const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,contact:bk.phone,status:"pending"};
+    await supaFetch("POST","bookings",[row]);
+  }
+
+  // Single admin email listing all dates
+  const dateList=allBks.map(b=>dateLabel(b.date)).join(", ");
+  const skippedMsg=skippedDates.length>0?" ("+skippedDates.length+" week"+(skippedDates.length>1?"s":"")+" skipped — already booked)":"";
+  await notifyAdminRecurring(allBks[0], dateList, skippedMsg);
+
+  // Show user summary
+  let msg="Booking requests submitted for "+allBks.length+" week"+(allBks.length>1?"s":"")+":\n\n";
+  allBks.forEach(b=>{ msg+="✓ "+dateLabel(b.date)+" — "+fmt12(b.slot)+" to "+fmt12(b.slotEnd)+"\n"; });
+  if(skippedDates.length>0){ msg+="\nSkipped (already booked):\n"; skippedDates.forEach(d=>{ msg+="✗ "+dateLabel(d)+"\n"; }); }
+  alert(msg);
 }
 
 async function submitNotify(slotStart) {
@@ -892,6 +923,27 @@ async function submitNotify(slotStart) {
   const body = encodeURIComponent("A coach has requested to be notified if a cancellation occurs.\n\nDate: "+dateLabel(activeDate)+"\nTime: "+slotLabel(slotStart)+"\nName: "+name+"\nEmail: "+email+(phone?"\nPhone: "+phone:""));
   activeSlot=null; activeForm=null; renderDayView();
   window.open("mailto:"+ADMIN_EMAIL+"?subject="+subj+"&body="+body,"_blank");
+}
+
+async function notifyAdminRecurring(b, dateList, skippedMsg) {
+  try {
+    await emailjs.send(EJS_SERVICE, EJS_ADMIN_TPL, {
+      date:        dateList + skippedMsg,
+      slot:        slotLabel(b.slot, b.slotEnd),
+      pitch:       b.pitch,
+      half:        b.half,
+      team:        b.team,
+      coach:       b.coach,
+      coach_email: b.email,
+      phone:       b.phone || "Not provided",
+      booking_id:  "Recurring — " + dateList
+    });
+  } catch(err) {
+    console.warn("EmailJS recurring notify failed:", err);
+    const subj = encodeURIComponent("[DB GAA] Recurring Booking — "+b.team+" @ "+b.pitch);
+    const body = encodeURIComponent("Recurring booking requests submitted.\n\nDates: "+dateList+skippedMsg+"\nTime: "+slotLabel(b.slot,b.slotEnd)+"\nPitch: "+b.pitch+" ("+b.half+" pitch)\nTeam: "+b.team+"\nCoach: "+b.coach+"\nEmail: "+b.email+(b.phone?"\nPhone: "+b.phone:""));
+    window.open("mailto:"+ADMIN_EMAIL+"?subject="+subj+"&body="+body,"_blank");
+  }
 }
 
 async function notifyAdmin(b) {
