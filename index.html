@@ -1213,11 +1213,14 @@ async function submitAdminBooking() {
   const slotEnd = customEnd || (slotObj ? slotObj.end : "");
   const booking = { id:Date.now().toString(), date, slot, slotEnd, pitch, half:adminBookHalf, team, coach, email, phone, status:"approved", submittedAt:new Date().toISOString() };
   bookings.push(booking);
-  renderAdminPanel(true); renderDayView(); renderMini();
   const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, contact:booking.phone, status:"approved" };
   const result = await supaFetch("POST","bookings",[row]);
-  if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); renderAdminPanel(); renderDayView(); renderMini(); return; }
+  if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); return; }
   if (email) sendConfirmation(booking, true);
+  // Close admin panel and navigate to the booked date so it shows immediately
+  closeAdminPanel();
+  selectDate(date);
+  alert("Booking saved for " + team + " on " + dateLabel(date) + " at " + slotLabel(slot) + ". Viewing day now.");
 }
 
 async function approveBooking(id) {
