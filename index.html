@@ -814,12 +814,14 @@ function buildBookingForm(){
 function updateEndTimeOpts(){
   const s=document.getElementById("fStartTime"),e=document.getElementById("fEndTime");
   if(!s||!e) return;
-  const minEnd=timeToMins(s.value)+60;
+  const startMins=timeToMins(s.value);
+  const minEnd=startMins+60;   // 1 hour minimum
+  const maxEnd=startMins+120;  // 2 hour maximum for users
   const isWE=(()=>{if(!activeDate)return false;const[y,m,d]=activeDate.split("-").map(Number);return new Date(y,m-1,d).getDay()%6===0;})();
   const opts=isWE?WEEKEND_TIME_OPTS:WEEKDAY_TIME_OPTS;
   const prev=e.value;
-  e.innerHTML=opts.filter(o=>timeToMins(o.val)>=minEnd).map(o=>`<option value="${o.val}"${o.val===prev?" selected":""}>${o.label}</option>`).join("");
-  if(!e.value){const def=opts.find(o=>timeToMins(o.val)>=minEnd);if(def)e.value=def.val;}
+  e.innerHTML=opts.filter(o=>timeToMins(o.val)>=minEnd&&timeToMins(o.val)<=maxEnd).map(o=>`<option value="${o.val}"${o.val===prev?" selected":""}>${o.label}</option>`).join("");
+  if(!e.value){const def=opts.find(o=>timeToMins(o.val)>=minEnd&&timeToMins(o.val)<=maxEnd);if(def)e.value=def.val;}
 }
 
 
@@ -849,7 +851,9 @@ async function submitBooking(){
   const phone=(document.getElementById("fPhone")||{value:""}).value.trim();
   const pitch=(document.getElementById("fPitch")||{value:""}).value;
   if(!st||!et){alert("Please select a start and end time.");return;}
-  if(timeToMins(et)-timeToMins(st)<60){const el=document.getElementById("timeError");if(el)el.style.display="block";alert("End time must be at least 1 hour after start time.");return;}
+  const dur=timeToMins(et)-timeToMins(st);
+  if(dur<60){const el=document.getElementById("timeError");if(el)el.style.display="block";alert("End time must be at least 1 hour after start time.");return;}
+  if(dur>120){alert("Maximum booking duration is 2 hours.");return;}
   if(!team){alert("Please enter a team name.");return;}
   if(!coach){alert("Please enter the coach name.");return;}
   if(!email){alert("Please enter an email address.");return;}
