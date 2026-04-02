@@ -696,7 +696,7 @@ function renderDayView() {
       
       const pb=dBks.filter(b=>b.pitch===pitch);
       const bdg=document.createElement("span"); bdg.className=pb.length===0?"pitch-badge available":"pitch-badge half";
-      bdg.textContent=pb.length===0?"✓ "+pitch+(pitch==="Dromcollogher"?" (full pitch)":""):"◑ "+pitch+": "+pb.length+" booking"+(pb.length>1?"s":"");
+      bdg.textContent=pb.length===0?"✓ "+pitch"":"◑ "+pitch+": "+pb.length+" booking"+(pb.length>1?"s":"");
       avRow.appendChild(bdg);
     });
     avSec.appendChild(avRow); scr.appendChild(avSec);
