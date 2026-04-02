@@ -379,6 +379,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
       <button class="view-btn" id="btnSummary" onclick="openSummaryPin()">Summary</button>
     </div>
     <button class="btn btn-ghost" onclick="window.print()">Print</button>
+    <button class="btn btn-outline" onclick="openHelpModal()" style="border-radius:50%;width:34px;height:34px;padding:0;font-size:16px;font-weight:700;flex-shrink:0;border-color:rgba(255,255,255,0.4);color:white;" title="How to book">?</button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
   </div>
 </header>
@@ -477,7 +478,6 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 <script>
 // ── EMAILJS CONFIG ────────────────────────────────────────────────
 const EJS_SERVICE   = "service_0odxd2n";
-const EJS_ADMIN_TPL = "template_inwgmy7";
 const EJS_COACH_TPL = "template_hhy3g16";
 const EJS_PUB_KEY   = "IcDi65IPaYa2Ix4qI";
 (function() { try { emailjs.init({ publicKey: EJS_PUB_KEY }); } catch(e) { console.warn("EmailJS init failed:", e); } })();
@@ -595,6 +595,26 @@ function loader(on) { document.getElementById("globalLoader").style.opacity = on
 function getHomeFixtures(d)  { return HOME_FIXTURES.filter(f => f.date===d); }
 function getAwayFixtures(d)  { return AWAY_FIXTURES.filter(f => f.date===d); }
 function getDayBookings(d)   { return bookings.filter(b => b.date===d && (b.status==="approved"||b.status==="pending")); }
+function isAfterBookingCutoff(dateStr) {
+  // Returns true if today is past the Thursday cutoff for the week containing dateStr
+  // Cutoff = midnight Thursday of the week BEFORE the booking week
+  const [y,m,d] = dateStr.split("-").map(Number);
+  const bookingDate = new Date(y, m-1, d);
+  // Find Monday of the booking week
+  const dayOfWeek = bookingDate.getDay(); // 0=Sun,1=Mon...6=Sat
+  const daysToMonday = dayOfWeek===0 ? 6 : dayOfWeek-1;
+  const monday = new Date(bookingDate);
+  monday.setDate(monday.getDate() - daysToMonday);
+  // Cutoff = Thursday before that Monday (4 days before Monday = previous Thursday)
+  const cutoff = new Date(monday);
+  cutoff.setDate(cutoff.getDate() - 4); // Thursday = Monday - 4 days... wait
+  // Actually: Mon - 1 = Sun, Mon - 2 = Sat, Mon - 3 = Fri, Mon - 4 = Thu
+  cutoff.setHours(23, 59, 59, 0); // end of Thursday
+  const today = new Date();
+  today.setHours(23, 59, 59, 0);
+  return today > cutoff;
+}
+
 function timeToMins(t) {
   if (!t) return 0;
   const [h,m] = t.split(":").map(Number);
@@ -640,7 +660,9 @@ function renderMini() {
     if (ds===todayStr) cls+=" today";
     if (ds===activeDate) cls+=" selected";
     if (hasAnyBooking(ds)) cls+=" has-event";
+    if (isAfterBookingCutoff(ds)) cls+=" past-cutoff";
     if (isHomFixtureDay(ds)) cls+=" fixture-day";
+    if (isAfterBookingCutoff(ds)) cls+=" past-cutoff";
     cell.className = cls;
     cell.textContent = d;
     cell.onclick = () => selectDate(ds);
@@ -756,22 +778,8 @@ function buildBookingForm(){
       </div>
     </div>
     <div id="halfAvailNote" style="font-size:11px;color:var(--amber);margin-top:-4px;margin-bottom:8px;"></div>
-    <div class="recurring-section">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
-        <input type="checkbox" id="fRecurring" onchange="toggleRecurring()" style="width:16px;height:16px;"> Make this a recurring booking
-      </label>
-      <div id="recurringOpts" style="display:none;margin-top:8px;">
-        <label style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Number of weeks</label>
-        <select id="fWeeks" style="margin-top:0;">
-          <option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option>
-          <option value="5">5 weeks</option><option value="6">6 weeks</option><option value="7">7 weeks</option>
-          <option value="8">8 weeks</option><option value="9">9 weeks</option><option value="10">10 weeks</option>
-          <option value="11">11 weeks</option><option value="12">12 weeks</option>
-        </select>
-        <div style="font-size:10px;color:var(--amber);margin-top:4px;">Each week submitted as a separate pending request. Weeks already booked will be skipped.</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text3);background:var(--cream2);border-radius:6px;padding:8px 10px;margin-bottom:10px;">Your request will be sent to admin for approval.</div>
+    
+    <div style="font-size:11px;color:var(--text3);background:var(--cream2);border-radius:6px;padding:8px 10px;margin-bottom:10px;">Your request will be sent to admin automatically. Requests must be submitted by Thursday midnight. Decisions made on Friday.</div>
     <div class="form-actions">
       <button class="btn btn-outline" onclick="activeForm=null;renderDayView()">Cancel</button>
       <button class="btn btn-red" onclick="submitBooking()">Submit Booking Request</button>
@@ -862,6 +870,12 @@ async function submitBooking(){
   const pitch=(document.getElementById("fPitch")||{value:""}).value;
   const half=selectedHalf;
 
+  // Booking cutoff check
+  if (activeDate && isAfterBookingCutoff(activeDate)) {
+    alert("Bookings for this week are now closed.\n\nAll requests must be submitted by midnight on Thursday of the previous week.\n\nPlease contact the club directly if you have an urgent request.");
+    return;
+  }
+
   if(!st||!et){alert("Please select a start and end time.");return;}
   const dur=timeToMins(et)-timeToMins(st);
   if(dur<60){const el=document.getElementById("timeError");if(el)el.style.display="block";alert("End time must be at least 1 hour after start time.");return;}
@@ -871,7 +885,6 @@ async function submitBooking(){
   if(!email){alert("Please enter an email address.");return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return;}
 
-  // Check clash on first date
   const over=bookings.filter(b=>b.date===activeDate&&b.pitch===pitch&&(b.status==="pending"||b.status==="approved")&&slotsOverlap(st,et,b.slot,b.slotEnd||et));
   if(over.length>0){
     const booked=over.reduce((s,b)=>s+(b.half==="full"?2:1),0);
@@ -879,48 +892,15 @@ async function submitBooking(){
     if(booked>=2){alert("This pitch is fully booked for the selected time.");return;}
   }
 
-  const isRec=document.getElementById("fRecurring")&&document.getElementById("fRecurring").checked;
-  const weeks=isRec?parseInt((document.getElementById("fWeeks")||{value:"1"}).value):1;
-
-  // Build list of dates - skip already booked weeks
-  const bookedDates=[], skippedDates=[];
-  for(let w=0;w<weeks;w++){
-    const bkDate=w===0?activeDate:addDays(activeDate,w*7);
-    const clash=bookings.filter(b=>b.date===bkDate&&b.pitch===pitch&&(b.status==="pending"||b.status==="approved")&&slotsOverlap(st,et,b.slot,b.slotEnd||et));
-    const taken=clash.reduce((s,b)=>s+(b.half==="full"?2:1),0);
-    if((half==="full"&&taken>0)||(taken>=2)){ skippedDates.push(bkDate); continue; }
-    bookedDates.push(bkDate);
-  }
-  if(bookedDates.length===0){alert("No available slots found for any of the selected weeks.");return;}
-
+  const bk={id:Date.now().toString(),date:activeDate,slot:st,slotEnd:et,pitch,half,team,coach,email,phone,status:"pending",submittedAt:new Date().toISOString()};
+  bookings.push(bk);
   activeForm=null; selectedHalf="full"; renderDayView(); renderMini();
 
-  // Submit all bookings
-  const allBks=[];
-  for(let i=0;i<bookedDates.length;i++){
-    const bkDate=bookedDates[i];
-    const bk={id:Date.now().toString()+"_"+i,date:bkDate,slot:st,slotEnd:et,pitch,half,team,coach,email,phone,status:"pending",submittedAt:new Date().toISOString()};
-    bookings.push(bk); allBks.push(bk);
-    const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,contact:bk.phone,status:"pending"};
-    await supaFetch("POST","bookings",[row]);
-  }
+  const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,contact:bk.phone,status:"pending"};
+  const res=await supaFetch("POST","bookings",[row]);
+  if(!res){alert("Booking could not be saved. Please try again.");bookings=bookings.filter(b=>b.id!==bk.id);renderDayView();return;}
 
-  // Show success for single booking
-  if(weeks===1 && allBks.length===1){
-    alert("Booking request submitted!\n\n" + dateLabel(allBks[0].date) + " — " + fmt12(allBks[0].slot) + " to " + fmt12(allBks[0].slotEnd) + "\n" + allBks[0].pitch + " · " + (allBks[0].half==="full"?"Full pitch":"Half pitch") + "\n\nAdmin will review your request and you will receive a confirmation email.");
-    return;
-  }
-
-  // Single admin email listing all dates (recurring)
-  const dateList=allBks.map(b=>dateLabel(b.date)).join(", ");
-  const skippedMsg=skippedDates.length>0?" ("+skippedDates.length+" week"+(skippedDates.length>1?"s":"")+" skipped — already booked)":"";
-  await notifyAdminRecurring(allBks[0], dateList, skippedMsg);
-
-  // Show user summary
-  let msg="Booking requests submitted for "+allBks.length+" week"+(allBks.length>1?"s":"")+":\n\n";
-  allBks.forEach(b=>{ msg+="✓ "+dateLabel(b.date)+" — "+fmt12(b.slot)+" to "+fmt12(b.slotEnd)+"\n"; });
-  if(skippedDates.length>0){ msg+="\nSkipped (already booked):\n"; skippedDates.forEach(d=>{ msg+="✗ "+dateLabel(d)+"\n"; }); }
-  alert(msg);
+  alert("Booking request submitted!\n\n"+dateLabel(bk.date)+" \u2014 "+fmt12(bk.slot)+" to "+fmt12(bk.slotEnd)+"\n"+bk.pitch+" \u00b7 "+(bk.half==="full"?"Full pitch":"Half pitch")+"\n\nAdmin will review your request. All bookings are decided on the Friday of the previous week.");
 }
 
 async function submitNotify(slotStart) {
@@ -934,74 +914,7 @@ async function submitNotify(slotStart) {
   window.open("mailto:"+ADMIN_EMAIL+"?subject="+subj+"&body="+body,"_blank");
 }
 
-async function notifyAdminRecurring(b, dateList, skippedMsg) {
-  try {
-    await emailjs.send(EJS_SERVICE, EJS_ADMIN_TPL, {
-      date:        dateList + skippedMsg,
-      slot:        slotLabel(b.slot, b.slotEnd),
-      pitch:       b.pitch,
-      half:        b.half,
-      team:        b.team,
-      coach:       b.coach,
-      coach_email: b.email,
-      phone:       b.phone || "Not provided",
-      booking_id:  "Recurring — " + dateList
-    });
-  } catch(err) {
-    console.warn("EmailJS recurring notify failed:", err);
-    const subj = encodeURIComponent("[DB GAA] Recurring Booking — "+b.team+" @ "+b.pitch);
-    const body = encodeURIComponent("Recurring booking requests submitted.\n\nDates: "+dateList+skippedMsg+"\nTime: "+slotLabel(b.slot,b.slotEnd)+"\nPitch: "+b.pitch+" ("+b.half+" pitch)\nTeam: "+b.team+"\nCoach: "+b.coach+"\nEmail: "+b.email+(b.phone?"\nPhone: "+b.phone:""));
-    window.open("mailto:"+ADMIN_EMAIL+"?subject="+subj+"&body="+body,"_blank");
-  }
-}
 
-async function notifyAdmin(b) {
-  try {
-    await emailjs.send(EJS_SERVICE, EJS_ADMIN_TPL, {
-      date:        dateLabel(b.date),
-      slot:        slotLabel(b.slot, b.slotEnd),
-      pitch:       b.pitch,
-      half:        b.half,
-      team:        b.team,
-      coach:       b.coach,
-      coach_email: b.email,
-      phone:       b.phone || "Not provided",
-      booking_id:  b.id
-    });
-    console.log("Admin notification sent via EmailJS");
-  } catch(err) {
-    console.warn("EmailJS failed, falling back to mailto:", err);
-    const subj = encodeURIComponent("[DB GAA] New Booking Request - "+dateLabel(b.date)+" "+slotLabel(b.slot)+" @ "+b.pitch);
-    const body = encodeURIComponent("New booking request.\n\nDate: "+dateLabel(b.date)+"\nTime: "+slotLabel(b.slot)+"\nPitch: "+b.pitch+" ("+b.half+" pitch)\nTeam: "+b.team+"\nCoach: "+b.coach+"\nEmail: "+b.email+(b.phone?"\nPhone: "+b.phone:"")+("\nBooking ID: "+b.id));
-    window.open("mailto:"+ADMIN_EMAIL+"?subject="+subj+"&body="+body,"_blank");
-  }
-}
-
-async function sendConfirmation(b, approved) {
-  if (!b.email) return;
-  try {
-    await emailjs.send(EJS_SERVICE, EJS_COACH_TPL, {
-      coach:      b.coach,
-      coach_email:b.email,
-      status:     approved ? "CONFIRMED" : "DECLINED",
-      message:    approved
-        ? "Your field booking has been confirmed. Please see details below."
-        : "Unfortunately your field booking request has been declined. Please contact the club if you have any questions.",
-      date:       dateLabel(b.date),
-      slot:       slotLabel(b.slot, b.slotEnd),
-      pitch:      b.pitch,
-      half:       b.half,
-      team:       b.team
-    });
-    console.log("Coach confirmation sent via EmailJS");
-  } catch(err) {
-    console.warn("EmailJS failed, falling back to mailto:", err);
-    const status = approved ? "CONFIRMED" : "DECLINED";
-    const subj = encodeURIComponent("[DB GAA] Booking "+status+" - "+dateLabel(b.date)+" "+slotLabel(b.slot)+" @ "+b.pitch);
-    const body = encodeURIComponent("Dear "+b.coach+",\n\n"+(approved?"Your field booking has been confirmed.\n\n":"Your field booking request has been declined.\n\n")+"Date: "+dateLabel(b.date)+"\nTime: "+slotLabel(b.slot)+"\nPitch: "+b.pitch+" ("+b.half+" pitch)\nTeam: "+b.team+"\n\nDromcollogher / Broadford GAA");
-    window.open("mailto:"+b.email+"?subject="+subj+"&body="+body,"_blank");
-  }
-}
 
 async function delBooking(id) {
   if (!confirm("Remove this booking? This cannot be undone.")) return;
@@ -1127,7 +1040,8 @@ function renderAdminPanel(showForm) {
         <div class="abr-actions">
           ${status==="pending" ? `<button class="btn btn-green btn-sm" onclick="approveBooking('${b.id}')">Approve</button><button class="btn btn-danger btn-sm" onclick="declineBooking('${b.id}')">Decline</button>` : ""}
           ${status==="declined" ? `<button class="btn btn-green btn-sm" onclick="approveBooking('${b.id}')">Approve instead</button>` : ""}
-          <button class="btn btn-outline btn-sm" onclick="adminDel('${b.id}')">Delete</button>
+          <button cla  <button class="btn btn-outline btn-sm" style="color:var(--amber2);border-color:var(--amber2);" onclick="openEditBooking(\'${b.id}\')">Edit</button>
+          ss="btn btn-outline btn-sm" onclick="adminDel('${b.id}')">Delete</button>
         </div>`;
       body.appendChild(row);
     });
@@ -1204,7 +1118,7 @@ async function submitAdminBooking() {
   const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, contact:booking.phone, status:"approved" };
   const result = await supaFetch("POST","bookings",[row]);
   if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); renderAdminPanel(); renderDayView(); renderMini(); return; }
-  if (email) sendConfirmation(booking, true);
+  
 }
 
 async function approveBooking(id) {
@@ -1219,11 +1133,10 @@ async function approveBooking(id) {
   }
   b.status="approved";
   await supaFetch("PATCH","bookings?id=eq."+id,{status:"approved"});
-  sendConfirmation(b,true);
+  sendConfirmation(b, true);
   for (const clash of clashes) {
     clash.status="declined";
     await supaFetch("PATCH","bookings?id=eq."+clash.id,{status:"declined"});
-    sendConfirmation(clash,false);
   }
   renderAdminPanel(); renderDayView(); renderMini();
 }
@@ -1233,7 +1146,7 @@ async function declineBooking(id) {
   b.status="declined";
   renderAdminPanel(); renderDayView(); renderMini();
   await supaFetch("PATCH","bookings?id=eq."+id,{status:"declined"});
-  sendConfirmation(b,false);
+  sendConfirmation(b, false);
 }
 
 async function adminDel(id) {
@@ -1429,13 +1342,150 @@ function renderSummary() {
 }
 
 // ── RECURRING ────────────────────────────────────────────────────
-function toggleRecurring() {
-  const cb   = document.getElementById("fRecurring");
-  const opts = document.getElementById("recurringOpts");
-  if (opts) opts.style.display = cb && cb.checked ? "block" : "none";
-}
+
 
 // ── VIEW MANAGEMENT ──────────────────────────────────────────────
+let editingBookingId = null;
+
+function openEditBooking(id) {
+  const b = bookings.find(x => x.id === id);
+  if (!b) return;
+  editingBookingId = id;
+
+  // Populate original details
+  const orig = document.getElementById("editOriginalDetails");
+  if (orig) orig.innerHTML = "<strong style='color:#b8860b;'>Current booking:</strong><br>"
+    + dateLabel(b.date) + " &nbsp;&middot;&nbsp; " + fmt12(b.slot) + " – " + fmt12(b.slotEnd)
+    + " &nbsp;&middot;&nbsp; " + b.pitch + " &nbsp;&middot;&nbsp; " + (b.half==="full"?"Full pitch":"Half pitch");
+
+  // Pre-fill form
+  const dateEl = document.getElementById("editDate");
+  const pitchEl = document.getElementById("editPitch");
+  const startEl = document.getElementById("editStart");
+  const endEl   = document.getElementById("editEnd");
+  const halfEl  = document.getElementById("editHalf");
+  if (dateEl)  dateEl.value  = b.date;
+  if (pitchEl) pitchEl.value = b.pitch;
+  if (startEl) startEl.value = b.slot;
+  if (endEl)   endEl.value   = b.slotEnd || b.slot;
+  if (halfEl)  halfEl.value  = b.half || "full";
+
+  // Update email preview
+  updateEditEmailPreview();
+
+  const overlay = document.getElementById("editBookingOverlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
+function updateEditEmailPreview() {
+  const preview = document.getElementById("editEmailPreview");
+  const b = bookings.find(x => x.id === editingBookingId);
+  if (!preview || !b) return;
+  const newDate  = (document.getElementById("editDate")||{value:b.date}).value;
+  const newStart = (document.getElementById("editStart")||{value:b.slot}).value;
+  const newEnd   = (document.getElementById("editEnd")||{value:b.slotEnd}).value;
+  const newPitch = (document.getElementById("editPitch")||{value:b.pitch}).value;
+  const newHalf  = (document.getElementById("editHalf")||{value:b.half}).value;
+  preview.innerHTML = "Email will be sent to <strong>" + (b.email||"coach") + "</strong> showing:<br>"
+    + "<span style='color:#c0182a;'>✖ Old: " + dateLabel(b.date) + " &nbsp; " + fmt12(b.slot) + "–" + fmt12(b.slotEnd) + " &nbsp; " + b.pitch + " &nbsp; " + (b.half==="full"?"Full":"Half") + " pitch</span><br>"
+    + "<span style='color:#2d7a45;'>✔ New: " + dateLabel(newDate) + " &nbsp; " + fmt12(newStart) + "–" + fmt12(newEnd) + " &nbsp; " + newPitch + " &nbsp; " + (newHalf==="full"?"Full":"Half") + " pitch</span>";
+}
+
+function closeEditBooking() {
+  const overlay = document.getElementById("editBookingOverlay");
+  if (overlay) overlay.style.display = "none";
+  editingBookingId = null;
+}
+
+async function saveEditBooking() {
+  const b = bookings.find(x => x.id === editingBookingId);
+  if (!b) return;
+
+  const newDate  = (document.getElementById("editDate")||{value:b.date}).value;
+  const newStart = (document.getElementById("editStart")||{value:b.slot}).value;
+  const newEnd   = (document.getElementById("editEnd")||{value:b.slotEnd}).value;
+  const newPitch = (document.getElementById("editPitch")||{value:b.pitch}).value;
+  const newHalf  = (document.getElementById("editHalf")||{value:b.half}).value;
+  if (!newDate || !newStart || !newEnd) { alert("Please fill in all fields."); return; }
+  if (timeToMins(newEnd) <= timeToMins(newStart)) { alert("End time must be after start time."); return; }
+
+  // Store old details for email
+  const oldDate  = b.date;
+  const oldSlot  = b.slot;
+  const oldEnd   = b.slotEnd;
+  const oldPitch = b.pitch;
+  const oldHalf  = b.half;
+
+  // Update local booking
+  b.date    = newDate;
+  b.slot    = newStart;
+  b.slotEnd = newEnd;
+  b.pitch   = newPitch;
+  b.half    = newHalf;
+
+  closeEditBooking();
+  renderAdminPanel(); renderDayView(); renderMini();
+
+  // Save to Supabase
+  await supaFetch("PATCH", "bookings?id=eq."+b.id, {
+    date: newDate, slot: newStart, slot_end: newEnd,
+    location: newPitch, notes: newHalf
+  });
+
+  // Always send email to coach
+  if (b.email) {
+    try {
+      await emailjs.send(EJS_SERVICE, EJS_COACH_TPL, {
+        coach:      b.coach,
+        coach_email:b.email,
+        status:     "UPDATED",
+        message:    "Your field booking has been updated by admin. Please see the new details below.\n\n"
+          + "Previous booking: " + dateLabel(oldDate) + ", " + fmt12(oldSlot) + "–" + fmt12(oldEnd) + ", " + oldPitch + " (" + (oldHalf==="full"?"Full":"Half") + " pitch)\n"
+          + "New booking: " + dateLabel(newDate) + ", " + fmt12(newStart) + "–" + fmt12(newEnd) + ", " + newPitch + " (" + (newHalf==="full"?"Full":"Half") + " pitch)",
+        date:       dateLabel(newDate),
+        slot:       fmt12(newStart) + " – " + fmt12(newEnd),
+        pitch:      newPitch,
+        half:       newHalf,
+        team:       b.team
+      });
+      console.log("Edit notification sent to coach");
+    } catch(err) {
+      console.warn("Edit email failed:", err);
+    }
+  }
+}
+
+function openHelpModal() {
+  const m = document.getElementById("helpOverlay");
+  if (m) { m.style.display = "flex"; }
+}
+function closeHelpModal() {
+  const m = document.getElementById("helpOverlay");
+  if (m) { m.style.display = "none"; }
+}
+
+async function sendConfirmation(b, approved) {
+  if (!b.email) return;
+  try {
+    await emailjs.send(EJS_SERVICE, EJS_COACH_TPL, {
+      coach:      b.coach,
+      coach_email:b.email,
+      status:     approved ? "CONFIRMED" : "DECLINED",
+      message:    approved
+        ? "Your field booking has been confirmed. Please see details below."
+        : "Unfortunately your field booking request has been declined. Please contact the club if you have any questions.",
+      date:       dateLabel(b.date),
+      slot:       slotLabel(b.slot, b.slotEnd),
+      pitch:      b.pitch,
+      half:       b.half,
+      team:       b.team
+    });
+    console.log("Coach confirmation sent via EmailJS");
+  } catch(err) {
+    console.warn("EmailJS confirmation failed:", err);
+  }
+}
+
 // INIT
 window.onerror = function(msg, src, line, col, err) {
   try {
@@ -1460,5 +1510,77 @@ window.addEventListener("beforeunload", (e) => {
   if (activeSlot && activeForm) { e.preventDefault(); e.returnValue = ""; }
 });
 </script>
+
+<!-- HELP MODAL -->
+<div id="helpOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="background:#c0182a;border-radius:14px 14px 0 0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="color:white;font-size:16px;font-weight:700;font-family:'Outfit',sans-serif;">How to Make a Booking</div>
+      <button onclick="closeHelpModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:20px 24px;font-family:'Outfit',sans-serif;font-size:13px;color:#333;line-height:1.7;">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">1</div><div><strong>Pick a date</strong> — Tap any date on the calendar on the left. Use the arrows to move between months.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">2</div><div><strong>Check availability</strong> — You'll see which pitches are available for that day. Any existing bookings are listed at the top.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">3</div><div><strong>Tap the red button</strong> — Tap <strong>+ Book a Time Slot</strong> to open the booking form.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">4</div><div><strong>Choose your time</strong> — Select a start and end time. Minimum 1 hour, maximum 2 hours. Weekdays 5pm–10pm, weekends 7am–10pm.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">5</div><div><strong>Fill in your details</strong> — Enter your team name, coach name, email address, contact number, pitch preference, and full or half pitch.</div></div>
+
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">7</div><div><strong>Submit</strong> — Tap <strong>Submit Booking Request</strong>. Your booking will be sent to admin automatically.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">8</div><div><strong>Wait for approval</strong> — Your booking shows as Pending. Admin will review it and you'll receive a confirmation email once approved or declined. All requests must be submitted by midnight Thursday of the previous week. Decisions are made on Friday.</div></div>
+        <div style="display:flex;gap:12px;"><div style="background:#d4870a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">!</div><div><strong>Need to cancel?</strong> — Contact the club directly to cancel an approved booking so the slot can be released to others.</div></div>
+      </div>
+    </div>
+    <div style="padding:12px 24px 20px;text-align:center;">
+      <button onclick="closeHelpModal()" style="background:#c0182a;color:white;border:none;border-radius:8px;padding:10px 32px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BOOKING MODAL -->
+<div id="editBookingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:3000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:14px;max-width:520px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
+    <div style="background:#1a1a1a;border-radius:14px 14px 0 0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="color:white;font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">Edit Booking</div>
+      <button onclick="closeEditBooking()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:18px 22px;font-family:'Outfit',sans-serif;">
+      <div id="editOriginalDetails" style="background:#fff8e6;border:1px solid #f0d080;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#555;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Date</label>
+          <input type="date" id="editDate" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;"></div>
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Pitch</label>
+          <select id="editPitch" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;">
+            <option value="Dromcollogher">Dromcollogher</option>
+            <option value="Tullylease">Tullylease</option>
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Start time</label>
+          <select id="editStart" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;"><option value="07:00">7:00am</option><option value="07:15">7:15am</option><option value="07:30">7:30am</option><option value="07:45">7:45am</option><option value="08:00">8:00am</option><option value="08:15">8:15am</option><option value="08:30">8:30am</option><option value="08:45">8:45am</option><option value="09:00">9:00am</option><option value="09:15">9:15am</option><option value="09:30">9:30am</option><option value="09:45">9:45am</option><option value="10:00">10:00am</option><option value="10:15">10:15am</option><option value="10:30">10:30am</option><option value="10:45">10:45am</option><option value="11:00">11:00am</option><option value="11:15">11:15am</option><option value="11:30">11:30am</option><option value="11:45">11:45am</option><option value="12:00">12:00pm</option><option value="12:15">12:15pm</option><option value="12:30">12:30pm</option><option value="12:45">12:45pm</option><option value="13:00">1:00pm</option><option value="13:15">1:15pm</option><option value="13:30">1:30pm</option><option value="13:45">1:45pm</option><option value="14:00">2:00pm</option><option value="14:15">2:15pm</option><option value="14:30">2:30pm</option><option value="14:45">2:45pm</option><option value="15:00">3:00pm</option><option value="15:15">3:15pm</option><option value="15:30">3:30pm</option><option value="15:45">3:45pm</option><option value="16:00">4:00pm</option><option value="16:15">4:15pm</option><option value="16:30">4:30pm</option><option value="16:45">4:45pm</option><option value="17:00">5:00pm</option><option value="17:15">5:15pm</option><option value="17:30">5:30pm</option><option value="17:45">5:45pm</option><option value="18:00">6:00pm</option><option value="18:15">6:15pm</option><option value="18:30">6:30pm</option><option value="18:45">6:45pm</option><option value="19:00">7:00pm</option><option value="19:15">7:15pm</option><option value="19:30">7:30pm</option><option value="19:45">7:45pm</option><option value="20:00">8:00pm</option><option value="20:15">8:15pm</option><option value="20:30">8:30pm</option><option value="20:45">8:45pm</option><option value="21:00">9:00pm</option><option value="21:15">9:15pm</option><option value="21:30">9:30pm</option><option value="21:45">9:45pm</option><option value="22:00">10:00pm</option></select></div>
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">End time</label>
+          <select id="editEnd" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;"><option value="07:00">7:00am</option><option value="07:15">7:15am</option><option value="07:30">7:30am</option><option value="07:45">7:45am</option><option value="08:00">8:00am</option><option value="08:15">8:15am</option><option value="08:30">8:30am</option><option value="08:45">8:45am</option><option value="09:00">9:00am</option><option value="09:15">9:15am</option><option value="09:30">9:30am</option><option value="09:45">9:45am</option><option value="10:00">10:00am</option><option value="10:15">10:15am</option><option value="10:30">10:30am</option><option value="10:45">10:45am</option><option value="11:00">11:00am</option><option value="11:15">11:15am</option><option value="11:30">11:30am</option><option value="11:45">11:45am</option><option value="12:00">12:00pm</option><option value="12:15">12:15pm</option><option value="12:30">12:30pm</option><option value="12:45">12:45pm</option><option value="13:00">1:00pm</option><option value="13:15">1:15pm</option><option value="13:30">1:30pm</option><option value="13:45">1:45pm</option><option value="14:00">2:00pm</option><option value="14:15">2:15pm</option><option value="14:30">2:30pm</option><option value="14:45">2:45pm</option><option value="15:00">3:00pm</option><option value="15:15">3:15pm</option><option value="15:30">3:30pm</option><option value="15:45">3:45pm</option><option value="16:00">4:00pm</option><option value="16:15">4:15pm</option><option value="16:30">4:30pm</option><option value="16:45">4:45pm</option><option value="17:00">5:00pm</option><option value="17:15">5:15pm</option><option value="17:30">5:30pm</option><option value="17:45">5:45pm</option><option value="18:00">6:00pm</option><option value="18:15">6:15pm</option><option value="18:30">6:30pm</option><option value="18:45">6:45pm</option><option value="19:00">7:00pm</option><option value="19:15">7:15pm</option><option value="19:30">7:30pm</option><option value="19:45">7:45pm</option><option value="20:00">8:00pm</option><option value="20:15">8:15pm</option><option value="20:30">8:30pm</option><option value="20:45">8:45pm</option><option value="21:00">9:00pm</option><option value="21:15">9:15pm</option><option value="21:30">9:30pm</option><option value="21:45">9:45pm</option><option value="22:00">10:00pm</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Full or Half Pitch</label>
+          <select id="editHalf" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;">
+            <option value="full">Full Pitch</option>
+            <option value="half">Half Pitch</option>
+          </select></div>
+      </div>
+
+      <!-- EMAIL NOTIFICATION — always sent -->
+      <div style="background:#f0fff4;border:2px solid #2d7a45;border-radius:10px;padding:12px 14px;margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:700;color:#2d7a45;margin-bottom:4px;">📧 Confirmation email will be sent to coach</div>
+        <div style="font-size:11px;color:#555;" id="editEmailPreview">An email will be sent to the coach with the updated booking details.</div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeEditBooking()" style="background:none;border:1px solid #ddd;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;">Cancel</button>
+        <button onclick="saveEditBooking()" style="background:#c0182a;color:white;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
