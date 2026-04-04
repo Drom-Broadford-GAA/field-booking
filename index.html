@@ -568,7 +568,7 @@ async function loadBookings(retries) {
   loader(true);
   const data = await supaFetch("GET", "bookings?select=*&order=submitted_at.asc");
   if (data) {
-    bookings = data.map(r => ({ id:r.id, date:r.date, slot:r.slot, slotEnd:r.slot_end, pitch:r.location, half:r.notes, team:r.requester, coach:r.description, email:r.email, phone:r.contact, status:r.status, submittedAt:r.submitted_at }));
+    bookings = data.map(r => ({ id:r.id, date:r.date, slot:r.slot, slotEnd:r.slot_end, pitch:r.location, half:r.notes, team:r.requester, coach:r.description, email:r.email, phone:r.phone, bookingType:(r.contact||"Training"), status:r.status, submittedAt:r.submitted_at }));
     hideError();
   } else if (retries > 0) {
     console.log("Retrying loadBookings, attempts left:", retries);
@@ -893,7 +893,7 @@ async function submitBooking(){
   bookings.push(bk);
   activeForm=null; selectedHalf="full"; selectedBookingType="Training"; renderDayView(); renderMini();
 
-  const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,status:"pending"};
+  const row={id:bk.id,date:bk.date,slot:bk.slot,slot_end:bk.slotEnd,location:bk.pitch,notes:bk.half,requester:bk.team,description:bk.coach,email:bk.email,contact:bk.bookingType,status:"pending"};
   const res=await supaFetch("POST","bookings",[row]);
   if(!res){alert("Booking could not be saved. Please try again.");bookings=bookings.filter(b=>b.id!==bk.id);renderDayView();return;}
 
@@ -1114,7 +1114,7 @@ async function submitAdminBooking() {
   const booking = { id:Date.now().toString(), date, slot, slotEnd, pitch, half:adminBookHalf, bookingType:adminBookingType, team, coach, email, status:"approved", submittedAt:new Date().toISOString() };
   bookings.push(booking);
 
-  const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, status:"approved" };
+  const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, contact:booking.bookingType, status:"approved" };
   const result = await supaFetch("POST","bookings",[row]);
   if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); return; }
 
@@ -1371,6 +1371,8 @@ function openEditBooking(id) {
   if (startEl) startEl.value = b.slot;
   if (endEl)   endEl.value   = b.slotEnd || b.slot;
   if (halfEl)  halfEl.value  = b.half || "full";
+  const typeEl = document.getElementById("editBookingType");
+  if (typeEl)  typeEl.value  = b.bookingType || "Training";
 
   // Update email preview
   updateEditEmailPreview();
@@ -1388,9 +1390,10 @@ function updateEditEmailPreview() {
   const newEnd   = (document.getElementById("editEnd")||{value:b.slotEnd}).value;
   const newPitch = (document.getElementById("editPitch")||{value:b.pitch}).value;
   const newHalf  = (document.getElementById("editHalf")||{value:b.half}).value;
+  const newType  = (document.getElementById("editBookingType")||{value:b.bookingType||"Training"}).value;
   preview.innerHTML = "Email will be sent to <strong>" + (b.email||"coach") + "</strong> showing:<br>"
-    + "<span style='color:#c0182a;'>✖ Old: " + dateLabel(b.date) + " &nbsp; " + fmt12(b.slot) + "–" + fmt12(b.slotEnd) + " &nbsp; " + b.pitch + " &nbsp; " + (b.half==="full"?"Full":"Half") + " pitch</span><br>"
-    + "<span style='color:#2d7a45;'>✔ New: " + dateLabel(newDate) + " &nbsp; " + fmt12(newStart) + "–" + fmt12(newEnd) + " &nbsp; " + newPitch + " &nbsp; " + (newHalf==="full"?"Full":"Half") + " pitch</span>";
+    + "<span style='color:#c0182a;'>✖ Old: " + dateLabel(b.date) + " &nbsp; " + fmt12(b.slot) + "–" + fmt12(b.slotEnd) + " &nbsp; " + b.pitch + " &nbsp; " + (b.half==="full"?"Full":"Half") + " pitch &nbsp; " + (b.bookingType||"Training") + "</span><br>"
+    + "<span style='color:#2d7a45;'>✔ New: " + dateLabel(newDate) + " &nbsp; " + fmt12(newStart) + "–" + fmt12(newEnd) + " &nbsp; " + newPitch + " &nbsp; " + (newHalf==="full"?"Full":"Half") + " pitch &nbsp; " + newType + "</span>";
 }
 
 function closeEditBooking() {
@@ -1408,6 +1411,7 @@ async function saveEditBooking() {
   const newEnd   = (document.getElementById("editEnd")||{value:b.slotEnd}).value;
   const newPitch = (document.getElementById("editPitch")||{value:b.pitch}).value;
   const newHalf  = (document.getElementById("editHalf")||{value:b.half}).value;
+  const newType  = (document.getElementById("editBookingType")||{value:b.bookingType||"Training"}).value;
   if (!newDate || !newStart || !newEnd) { alert("Please fill in all fields."); return; }
   if (timeToMins(newEnd) <= timeToMins(newStart)) { alert("End time must be after start time."); return; }
 
@@ -1419,11 +1423,12 @@ async function saveEditBooking() {
   const oldHalf  = b.half;
 
   // Update local booking
-  b.date    = newDate;
-  b.slot    = newStart;
-  b.slotEnd = newEnd;
-  b.pitch   = newPitch;
-  b.half    = newHalf;
+  b.date        = newDate;
+  b.slot        = newStart;
+  b.slotEnd     = newEnd;
+  b.pitch       = newPitch;
+  b.half        = newHalf;
+  b.bookingType = newType;
 
   closeEditBooking();
   renderAdminPanel(); renderDayView(); renderMini();
@@ -1431,7 +1436,7 @@ async function saveEditBooking() {
   // Save to Supabase
   await supaFetch("PATCH", "bookings?id=eq."+b.id, {
     date: newDate, slot: newStart, slot_end: newEnd,
-    location: newPitch, notes: newHalf
+    location: newPitch, notes: newHalf, contact: newType
   });
 
   // Always send email to coach
@@ -1643,6 +1648,11 @@ window.addEventListener("beforeunload", (e) => {
           <select id="editHalf" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;">
             <option value="full">Full Pitch</option>
             <option value="half">Half Pitch</option>
+          </select></div>
+        <div><label style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Type</label>
+          <select id="editBookingType" onchange="updateEditEmailPreview()" style="width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;">
+            <option value="Training">Training</option>
+            <option value="Match">Match</option>
           </select></div>
       </div>
 
