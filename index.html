@@ -25,13 +25,27 @@ body{font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);m
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--cream2);}::-webkit-scrollbar-thumb{background:var(--cream3);border-radius:3px;}
 
 /* HEADER */
-header{background:var(--black);display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:80px;flex-shrink:0;position:relative;overflow:hidden;}
+header{background:var(--black);display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:72px;flex-shrink:0;position:relative;overflow:hidden;}
 header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),var(--amber2),var(--red));}
-.header-left{display:flex;align-items:center;gap:14px;}
-.crest-img{height:64px;width:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));flex-shrink:0;}
-.header-title h1{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--white);line-height:1.15;}
+.header-left{display:flex;align-items:center;gap:10px;min-width:0;}
+.crest-img{height:52px;width:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));flex-shrink:0;}
+.header-title h1{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--white);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .header-title h1 span{color:var(--amber2);}
-.header-title p{font-size:10px;color:rgba(255,255,255,1);letter-spacing:0.12em;text-transform:uppercase;margin-top:3px;}
+.header-title p{font-size:9px;color:rgba(255,255,255,1);letter-spacing:0.10em;text-transform:uppercase;margin-top:2px;}
+.header-btns{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+/* Hide long button labels on mobile, show short ones */
+.btn-label-long{display:inline;}
+.btn-label-short{display:none;}
+@media(max-width:600px){
+  header{padding:0 10px;height:60px;}
+  .crest-img{height:42px;}
+  .header-title h1{font-size:13px;}
+  .header-title p{display:none;}
+  .header-btns{gap:5px;}
+  .btn-label-long{display:none;}
+  .btn-label-short{display:inline;}
+  .btn{padding:6px 10px;font-size:10px;}
+}
 
 /* BUTTONS */
 .btn{padding:8px 18px;border-radius:6px;font-size:11px;font-family:'Outfit',sans-serif;font-weight:700;cursor:pointer;border:none;transition:all .18s;letter-spacing:0.06em;text-transform:uppercase;}
@@ -373,9 +387,9 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
       <p>Field Booking System</p>
     </div>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;">
-    <button class="btn" onclick="openWeeklySummary(0)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">This Week's Bookings</button>
-    <button class="btn" onclick="openWeeklySummary(1)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">Next Week's Bookings</button>
+  <div class="header-btns">
+    <button class="btn" onclick="openWeeklySummary(0)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;"><span class="btn-label-long">This Week's Bookings</span><span class="btn-label-short">This Week</span></button>
+    <button class="btn" onclick="openWeeklySummary(1)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;"><span class="btn-label-long">Next Week's Bookings</span><span class="btn-label-short">Next Week</span></button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
   </div>
 </header>
@@ -684,7 +698,10 @@ function renderDayView() {
     dBks.forEach(b=>{
       const card=document.createElement("div"); card.className="booking-card"; card.style.cssText="margin-bottom:6px;";
       const bdg=b.status==="approved"?"<span class='badge-approved'>Approved</span>":"<span class='badge-pending'>Pending</span>";
-      card.innerHTML="<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong><span style='opacity:.6;font-size:11px;'>"+(b.bookingType?b.bookingType+" &middot; ":"")+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</span><span style='font-size:11px;color:var(--text3);'>"+fmt12(b.slot)+(b.slotEnd?" – "+fmt12(b.slotEnd):"")+"</span>"+bdg+"</span>";
+      const typeBdg=b.bookingType==='Match'
+        ? "<span style='font-size:11px;font-weight:700;color:#c0182a;background:#fdf0f2;border:1px solid #f8d7db;border-radius:20px;padding:2px 8px;'>Match</span>"
+        : "<span style='font-size:11px;font-weight:700;color:#156082;background:#e8f4fa;border:1px solid #bee3f0;border-radius:20px;padding:2px 8px;'>Training</span>";
+      card.innerHTML="<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong>"+typeBdg+"<span style='opacity:.6;font-size:11px;'>"+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</span><span style='font-size:11px;color:var(--text3);'>"+fmt12(b.slot)+(b.slotEnd?" – "+fmt12(b.slotEnd):"")+"</span>"+bdg+"</span>";
       sec.appendChild(card);
     });
     scr.appendChild(sec);
@@ -1518,7 +1535,9 @@ function openWeeklySummary(weekOffset) {
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
         + '<div style="display:flex;align-items:center;gap:8px;">'
         + '<strong style="font-size:13px;">'+b.team+'</strong>'
-        + (b.bookingType ? '<span style="font-size:11px;color:#888;">&middot; '+b.bookingType+'</span>' : '')
+        + (b.bookingType==='Match'
+            ? '<span style="font-size:11px;font-weight:700;color:#c0182a;background:#fdf0f2;border:1px solid #f8d7db;border-radius:20px;padding:2px 8px;">Match</span>'
+            : '<span style="font-size:11px;font-weight:700;color:#156082;background:#e8f4fa;border:1px solid #bee3f0;border-radius:20px;padding:2px 8px;">Training</span>')
         + '</div>'
         + (weekOffset === 1 ? '<span style="font-size:11px;font-weight:700;color:'+(isApproved?'#2d7a45':'#d4870a')+';background:white;border:1px solid '+(isApproved?'#2d7a45':'#d4870a')+';border-radius:20px;padding:2px 8px;">'+(isApproved?'Approved':'Pending')+'</span>' : '')
         + '</div>'
