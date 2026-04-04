@@ -374,7 +374,8 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
-    <button class="btn" onclick="openWeeklySummary()" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">This Week</button>
+    <button class="btn" onclick="openWeeklySummary(0)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">This Week's Bookings</button>
+    <button class="btn" onclick="openWeeklySummary(1)" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">Next Week's Bookings</button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
   </div>
 </header>
@@ -1462,19 +1463,21 @@ async function sendConfirmation(b, approved) {
   }
 }
 
-function getWeekRange() {
+function getWeekRange(weekOffset) {
+  weekOffset = weekOffset || 0;
   const today = new Date(todayStr);
   const day = today.getDay();
   const daysToMon = day === 0 ? 6 : day - 1;
-  const mon = new Date(today); mon.setDate(today.getDate() - daysToMon);
+  const mon = new Date(today); mon.setDate(today.getDate() - daysToMon + (weekOffset * 7));
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const pad = n => String(n).padStart(2,"0");
   const fmt = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   return { start: fmt(mon), end: fmt(sun), monDate: mon, sunDate: sun };
 }
 
-function openWeeklySummary() {
-  const range = getWeekRange();
+function openWeeklySummary(weekOffset) {
+  weekOffset = weekOffset || 0;
+  const range = getWeekRange(weekOffset);
   const overlay = document.getElementById("weeklySummaryOverlay");
   const titleEl = document.getElementById("weeklySummaryTitle");
   const rangeEl = document.getElementById("weeklySummaryRange");
@@ -1484,13 +1487,15 @@ function openWeeklySummary() {
   // Title
   const [sy,sm,sd] = range.start.split("-").map(Number);
   const [ey,em,ed] = range.end.split("-").map(Number);
+  if (titleEl) titleEl.textContent = weekOffset === 1 ? "Next Week's Bookings" : "This Week's Bookings";
   if (rangeEl) rangeEl.textContent = sd+" "+MONTHS[sm-1].slice(0,3)+" – "+ed+" "+MONTHS[em-1].slice(0,3)+" "+ey;
 
   // Filter bookings for this week - approved and pending only
-  const weekBks = bookings.filter(b =>
-    b.date >= range.start && b.date <= range.end &&
-    b.status === "approved"
-  ).sort((a,b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
+  const weekBks = bookings.filter(b => {
+    if (b.date < range.start || b.date > range.end) return false;
+    if (weekOffset === 1) return b.status === "approved" || b.status === "pending";
+    return b.status === "approved";
+  }).sort((a,b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
 
   if (!bodyEl) return;
 
@@ -1506,10 +1511,16 @@ function openWeeklySummary() {
         html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-top:'+(lastDate?'14px':'0')+'px;margin-bottom:6px;">'+dayName+', '+d+' '+MONTHS[m-1]+'</div>';
         lastDate = b.date;
       }
-      html += '<div style="background:#f0fff4;border:1px solid #c3e6cb;border-radius:8px;padding:10px 14px;margin-bottom:6px;">'
+      const isApproved = b.status === "approved";
+      const cardBg     = isApproved ? "#f0fff4" : "#fffbf0";
+      const cardBorder = isApproved ? "#c3e6cb" : "#ffe0a0";
+      html += '<div style="background:'+cardBg+';border:1px solid '+cardBorder+';border-radius:8px;padding:10px 14px;margin-bottom:6px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
         + '<div style="display:flex;align-items:center;gap:8px;">'
         + '<strong style="font-size:13px;">'+b.team+'</strong>'
         + (b.bookingType ? '<span style="font-size:11px;color:#888;">&middot; '+b.bookingType+'</span>' : '')
+        + '</div>'
+        + (weekOffset === 1 ? '<span style="font-size:11px;font-weight:700;color:'+(isApproved?'#2d7a45':'#d4870a')+';background:white;border:1px solid '+(isApproved?'#2d7a45':'#d4870a')+';border-radius:20px;padding:2px 8px;">'+(isApproved?'Approved':'Pending')+'</span>' : '')
         + '</div>'
         + '<div style="font-size:12px;color:#555;margin-top:4px;">'
         + fmt12(b.slot)+' – '+fmt12(b.slotEnd)
