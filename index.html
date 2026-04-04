@@ -1040,8 +1040,8 @@ function renderAdminPanel(showForm) {
         <div class="abr-actions">
           ${status==="pending" ? `<button class="btn btn-green btn-sm" onclick="approveBooking('${b.id}')">Approve</button><button class="btn btn-danger btn-sm" onclick="declineBooking('${b.id}')">Decline</button>` : ""}
           ${status==="declined" ? `<button class="btn btn-green btn-sm" onclick="approveBooking('${b.id}')">Approve instead</button>` : ""}
-          <button cla  <button class="btn btn-outline btn-sm" style="color:var(--amber2);border-color:var(--amber2);" onclick="openEditBooking(\'${b.id}\')">Edit</button>
-          ss="btn btn-outline btn-sm" onclick="adminDel('${b.id}')">Delete</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--amber2);border-color:var(--amber2);" onclick="openEditBooking(\'${b.id}\')">Edit</button>
+          <button class="btn btn-outline btn-sm" onclick="adminDel(\'${b.id}\')">Delete</button>
         </div>`;
       body.appendChild(row);
     });
