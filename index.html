@@ -374,6 +374,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
     </div>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
+    <button class="btn" onclick="openWeeklySummary()" style="background:var(--amber2);color:#1a1a1a;border:none;font-weight:700;">This Week</button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
   </div>
 </header>
@@ -1461,6 +1462,73 @@ async function sendConfirmation(b, approved) {
   }
 }
 
+function getWeekRange() {
+  const today = new Date(todayStr);
+  const day = today.getDay();
+  const daysToMon = day === 0 ? 6 : day - 1;
+  const mon = new Date(today); mon.setDate(today.getDate() - daysToMon);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const pad = n => String(n).padStart(2,"0");
+  const fmt = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  return { start: fmt(mon), end: fmt(sun), monDate: mon, sunDate: sun };
+}
+
+function openWeeklySummary() {
+  const range = getWeekRange();
+  const overlay = document.getElementById("weeklySummaryOverlay");
+  const titleEl = document.getElementById("weeklySummaryTitle");
+  const rangeEl = document.getElementById("weeklySummaryRange");
+  const bodyEl  = document.getElementById("weeklySummaryBody");
+  if (!overlay) return;
+
+  // Title
+  const [sy,sm,sd] = range.start.split("-").map(Number);
+  const [ey,em,ed] = range.end.split("-").map(Number);
+  if (rangeEl) rangeEl.textContent = sd+" "+MONTHS[sm-1].slice(0,3)+" – "+ed+" "+MONTHS[em-1].slice(0,3)+" "+ey;
+
+  // Filter bookings for this week - approved and pending only
+  const weekBks = bookings.filter(b =>
+    b.date >= range.start && b.date <= range.end &&
+    b.status === "approved"
+  ).sort((a,b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
+
+  if (!bodyEl) return;
+
+  if (weekBks.length === 0) {
+    bodyEl.innerHTML = '<div style="text-align:center;color:#999;padding:30px 0;font-size:14px;">No bookings for this week.</div>';
+  } else {
+    let html = '';
+    let lastDate = '';
+    weekBks.forEach(b => {
+      if (b.date !== lastDate) {
+        const [y,m,d] = b.date.split("-").map(Number);
+        const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(y,m-1,d).getDay()];
+        html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999;margin-top:'+(lastDate?'14px':'0')+'px;margin-bottom:6px;">'+dayName+', '+d+' '+MONTHS[m-1]+'</div>';
+        lastDate = b.date;
+      }
+      html += '<div style="background:#f0fff4;border:1px solid #c3e6cb;border-radius:8px;padding:10px 14px;margin-bottom:6px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<strong style="font-size:13px;">'+b.team+'</strong>'
+        + (b.bookingType ? '<span style="font-size:11px;color:#888;">&middot; '+b.bookingType+'</span>' : '')
+        + '</div>'
+        + '<div style="font-size:12px;color:#555;margin-top:4px;">'
+        + fmt12(b.slot)+' – '+fmt12(b.slotEnd)
+        + ' &nbsp;&middot;&nbsp; '+b.pitch
+        + ' &nbsp;&middot;&nbsp; '+(b.half==="full"?"Full pitch":"Half pitch")
+        + '</div>'
+        + '</div>';
+    });
+    bodyEl.innerHTML = html;
+  }
+
+  overlay.style.display = "flex";
+}
+
+function closeWeeklySummary() {
+  const overlay = document.getElementById("weeklySummaryOverlay");
+  if (overlay) overlay.style.display = "none";
+}
+
 // INIT
 window.onerror = function(msg, src, line, col, err) {
   try {
@@ -1560,6 +1628,20 @@ window.addEventListener("beforeunload", (e) => {
         <button onclick="saveEditBooking()" style="background:#c0182a;color:white;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">Save Changes</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- WEEKLY SUMMARY MODAL -->
+<div id="weeklySummaryOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:white;border-radius:14px;max-width:620px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);margin:auto;">
+    <div style="background:#1a1a1a;border-radius:14px 14px 0 0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="color:white;font-size:16px;font-weight:700;font-family:'Outfit',sans-serif;" id="weeklySummaryTitle">This Week's Bookings</div>
+        <div style="color:rgba(255,255,255,0.5);font-size:11px;margin-top:2px;" id="weeklySummaryRange"></div>
+      </div>
+      <button onclick="closeWeeklySummary()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div id="weeklySummaryBody" style="padding:16px 20px 20px;font-family:'Outfit',sans-serif;min-height:80px;"></div>
   </div>
 </div>
 </body>
