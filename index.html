@@ -379,7 +379,6 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
       <button class="view-btn" id="btnSummary" onclick="openSummaryPin()">Summary</button>
     </div>
     <button class="btn btn-ghost" onclick="window.print()">Print</button>
-    <button class="btn btn-outline" onclick="openHelpModal()" style="border-radius:50%;width:34px;height:34px;padding:0;font-size:16px;font-weight:700;flex-shrink:0;border-color:rgba(255,255,255,0.4);color:white;" title="How to book">?</button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
   </div>
 </header>
@@ -1091,34 +1090,33 @@ function updateAdminHalfNote() {
 
 async function submitAdminBooking() {
   const date  = (document.getElementById("abDate")||{value:""}).value;
-  const slot    = (document.getElementById("abStartTime")||{value:""}).value;
-  const customEnd = (document.getElementById("abEndTime")||{value:""}).value;
+  const slot  = (document.getElementById("abStartTime")||{value:""}).value;
+  const slotEnd = (document.getElementById("abEndTime")||{value:""}).value;
   const pitch = (document.getElementById("abPitch")||{value:""}).value;
   const team  = (document.getElementById("abTeam")||{value:""}).value.trim();
   const coach = (document.getElementById("abCoach")||{value:""}).value.trim();
   const email = (document.getElementById("abEmail")||{value:""}).value.trim();
   const phone = (document.getElementById("abPhone")||{value:""}).value.trim();
+
   if (!date||!team||!coach) { alert("Please fill in date, team and coach."); return; }
-  if (!slot && !isCustomTime) { alert("Please select a time slot or use a custom time."); return; }
-  if (isCustomTime) {
-    const startEl = document.getElementById("abStartTime");
-    const endEl   = document.getElementById("abEndTime");
-    if (startEl && endEl && startEl.value >= endEl.value) { alert("End time must be after start time."); return; }
-  }
+  if (!slot) { alert("Please select a start time."); return; }
+  if (!slotEnd || timeToMins(slotEnd) <= timeToMins(slot)) { alert("End time must be after start time."); return; }
 
   const booked = halvesBooked(date, slot, pitch);
   const halfLeft = 2 - booked;
   if (adminBookHalf==="full" && halfLeft<2) { alert("Full pitch not available. Only "+halfLeft+" half(s) remaining."); return; }
   if (halfLeft<=0) { alert("This pitch is fully booked for this slot."); return; }
-  const slotObj = [...WEEKDAY_SLOTS,...WEEKEND_SLOTS].find(s=>s.start===slot);
-  const slotEnd = customEnd || (slotObj ? slotObj.end : "");
+
   const booking = { id:Date.now().toString(), date, slot, slotEnd, pitch, half:adminBookHalf, team, coach, email, phone, status:"approved", submittedAt:new Date().toISOString() };
   bookings.push(booking);
-  renderAdminPanel(true); renderDayView(); renderMini();
+
   const row = { id:booking.id, date:booking.date, slot:booking.slot, slot_end:booking.slotEnd, location:booking.pitch, notes:booking.half, requester:booking.team, description:booking.coach, email:booking.email, contact:booking.phone, status:"approved" };
   const result = await supaFetch("POST","bookings",[row]);
-  if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); renderAdminPanel(); renderDayView(); renderMini(); return; }
-  
+  if (!result) { alert("Booking could not be saved. Please try again."); bookings=bookings.filter(b=>b.id!==booking.id); return; }
+
+  closeAdminPanel();
+  selectDate(date);
+  alert("Booking saved for "+team+" on "+dateLabel(date)+" at "+fmt12(slot)+" – "+fmt12(slotEnd)+".");
 }
 
 async function approveBooking(id) {
@@ -1455,15 +1453,6 @@ async function saveEditBooking() {
   }
 }
 
-function openHelpModal() {
-  const m = document.getElementById("helpOverlay");
-  if (m) { m.style.display = "flex"; }
-}
-function closeHelpModal() {
-  const m = document.getElementById("helpOverlay");
-  if (m) { m.style.display = "none"; }
-}
-
 async function sendConfirmation(b, approved) {
   if (!b.email) return;
   try {
@@ -1511,30 +1500,7 @@ window.addEventListener("beforeunload", (e) => {
 });
 </script>
 
-<!-- HELP MODAL -->
-<div id="helpOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px;">
-  <div style="background:white;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <div style="background:#c0182a;border-radius:14px 14px 0 0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="color:white;font-size:16px;font-weight:700;font-family:'Outfit',sans-serif;">How to Make a Booking</div>
-      <button onclick="closeHelpModal()" style="background:none;border:none;color:white;font-size:22px;cursor:pointer;line-height:1;">&times;</button>
-    </div>
-    <div style="padding:20px 24px;font-family:'Outfit',sans-serif;font-size:13px;color:#333;line-height:1.7;">
-      <div style="display:flex;flex-direction:column;gap:14px;">
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">1</div><div><strong>Pick a date</strong> — Tap any date on the calendar on the left. Use the arrows to move between months.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">2</div><div><strong>Check availability</strong> — You'll see which pitches are available for that day. Any existing bookings are listed at the top.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">3</div><div><strong>Tap the red button</strong> — Tap <strong>+ Book a Time Slot</strong> to open the booking form.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">4</div><div><strong>Choose your time</strong> — Select a start and end time. Minimum 1 hour, maximum 2 hours. Weekdays 5pm–10pm, weekends 7am–10pm.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">5</div><div><strong>Fill in your details</strong> — Enter your team name, coach name, email address, contact number, pitch preference, and full or half pitch.</div></div>
-
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">7</div><div><strong>Submit</strong> — Tap <strong>Submit Booking Request</strong>. Your booking will be sent to admin automatically.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#c0182a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">8</div><div><strong>Wait for approval</strong> — Your booking shows as Pending. Admin will review it and you'll receive a confirmation email once approved or declined. All requests must be submitted by midnight Thursday of the previous week. Decisions are made on Friday.</div></div>
-        <div style="display:flex;gap:12px;"><div style="background:#d4870a;color:white;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">!</div><div><strong>Need to cancel?</strong> — Contact the club directly to cancel an approved booking so the slot can be released to others.</div></div>
-      </div>
-    </div>
-    <div style="padding:12px 24px 20px;text-align:center;">
-      <button onclick="closeHelpModal()" style="background:#c0182a;color:white;border:none;border-radius:8px;padding:10px 32px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">Got it!</button>
-    </div>
-  </div>
+</div>
 </div>
 
 <!-- EDIT BOOKING MODAL -->
