@@ -438,7 +438,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 <!-- PIN -->
 <div class="overlay-backdrop" id="pinOverlay" tabindex="-1">
   <div class="pin-modal">
-    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" type="text" inputmode="none">
+    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;" type="text" inputmode="none">
     <h3>Admin Access</h3>
     <p>Enter PIN to manage bookings</p>
     <div class="pin-dots">
@@ -947,7 +947,7 @@ function updateDots() { for(let i=0;i<4;i++) document.getElementById("pd"+i).cla
 function pinPress(d) { if(pinBuffer.length>=4)return; pinBuffer+=d; updateDots(); if(pinBuffer.length===4)setTimeout(checkPin,150); }
 function pinClear() { pinBuffer=""; updateDots(); }
 function pinBack()  { pinBuffer=pinBuffer.slice(0,-1); updateDots(); }
-document.addEventListener("keydown", function(e) {
+window.addEventListener("keydown", function(e) {
   if (!document.getElementById("pinOverlay").classList.contains("open")) return;
   if (e.key >= "0" && e.key <= "9") { e.preventDefault(); pinPress(e.key); }
   else if (e.key === "Backspace") { e.preventDefault(); pinBack(); }
