@@ -940,7 +940,7 @@ async function delBooking(id) {
 }
 
 // PIN
-function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; const ov=document.getElementById("pinOverlay"); ov.classList.add("open"); ov.focus(); }
+function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; const ov=document.getElementById("pinOverlay"); ov.classList.add("open"); setTimeout(()=>ov.focus(),0); }
 function closePinOverlay() { document.getElementById("pinOverlay").classList.remove("open"); }
 function updateDots() { for(let i=0;i<4;i++) document.getElementById("pd"+i).classList.toggle("filled",i<pinBuffer.length); }
 function pinPress(d) { if(pinBuffer.length>=4)return; pinBuffer+=d; updateDots(); if(pinBuffer.length===4)setTimeout(checkPin,150); }
@@ -1236,7 +1236,7 @@ function openSummaryPin() {
   pinBuffer = "";
   updateDots();
   document.getElementById("pinError").textContent = "";
-  const ov2=document.getElementById("pinOverlay"); ov2.classList.add("open"); ov2.focus();
+  const ov2=document.getElementById("pinOverlay"); ov2.classList.add("open"); setTimeout(()=>ov2.focus(),0);
 }
 
 let summaryUnlocked = false;
