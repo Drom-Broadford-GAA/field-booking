@@ -438,7 +438,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 <!-- PIN -->
 <div class="overlay-backdrop" id="pinOverlay" tabindex="-1">
   <div class="pin-modal">
-    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" type="text" inputmode="none" readonly>
+    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" type="text" inputmode="none">
     <h3>Admin Access</h3>
     <p>Enter PIN to manage bookings</p>
     <div class="pin-dots">
@@ -454,6 +454,7 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
       <div class="pin-key" style="font-size:18px;" onclick="pinBack()">&#9003;</div>
     </div>
     <div class="pin-error" id="pinError"></div>
+    <div id="pinDebug" style="font-size:10px;color:#999;margin-top:4px;"></div>
     <button class="btn btn-outline btn-sm" style="margin-top:14px;" onclick="closePinOverlay()">Cancel</button>
   </div>
 </div>
@@ -948,6 +949,8 @@ function pinPress(d) { if(pinBuffer.length>=4)return; pinBuffer+=d; updateDots()
 function pinClear() { pinBuffer=""; updateDots(); }
 function pinBack()  { pinBuffer=pinBuffer.slice(0,-1); updateDots(); }
 document.addEventListener("keydown", function(e) {
+  const dbg = document.getElementById("pinDebug");
+  if (dbg) dbg.textContent = "key: " + e.key + " | open: " + document.getElementById("pinOverlay").classList.contains("open") + " | focus: " + document.activeElement?.id;
   if (document.getElementById("pinOverlay").style.display === "flex" ||
       document.getElementById("pinOverlay").classList.contains("open")) {
     if (e.key >= "0" && e.key <= "9") { e.preventDefault(); pinPress(e.key); }
