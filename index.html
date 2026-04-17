@@ -235,6 +235,23 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 .week-booking-pill{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 .week-blocked-label{font-size:10px;color:var(--red);font-weight:600;padding:4px 0;}
 
+/* WEEK BOOKINGS MODAL */
+.week-modal-backdrop{display:none;position:fixed;inset:0;background:rgba(10,10,10,0.55);z-index:300;align-items:flex-start;justify-content:center;padding:16px;backdrop-filter:blur(3px);overflow-y:auto;}
+.week-modal-backdrop.open{display:flex;}
+.week-modal{background:var(--white);border-radius:16px;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);margin:auto;position:relative;}
+.week-modal-header{padding:20px 44px 12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.week-modal-header h2{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--black);}
+.week-modal-header p{font-size:12px;color:var(--text3);margin-top:2px;}
+.week-modal-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:var(--cream2);border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--text2);}
+.week-modal-body{overflow-y:auto;padding:16px 20px;flex:1;}
+.week-modal-day-hdr{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;}
+.week-modal-day-hdr:first-child{margin-top:0;}
+.week-booking-card{background:var(--cream);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.week-booking-card-left{flex:1;min-width:0;}
+.week-booking-card-title{font-size:14px;font-weight:700;color:var(--black);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.week-booking-card-detail{font-size:12px;color:var(--text3);margin-top:3px;}
+.week-booking-empty{text-align:center;padding:32px 0;color:var(--text3);font-size:13px;}
+
 /* SUMMARY PAGE */
 .summary-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--cream);}
 .summary-header{background:var(--white);border-bottom:2px solid var(--cream2);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:10px;}
@@ -373,7 +390,8 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
   <div style="display:flex;gap:10px;align-items:center;">
     <div class="view-toggle">
       <button class="view-btn active" id="btnDay" onclick="setView('day')">Day</button>
-      <button class="view-btn" id="btnSummary" onclick="openSummaryPin()">Summary</button>
+      <button class="view-btn" onclick="openWeekModal('this')">This Week</button>
+      <button class="view-btn" onclick="openWeekModal('next')">Next Week</button>
     </div>
     <button class="btn btn-ghost" onclick="window.print()">Print</button>
     <button class="btn btn-red" onclick="openPinOverlay()">Admin</button>
@@ -435,10 +453,21 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
   </div>
 </div>
 
+<!-- WEEK BOOKINGS MODAL -->
+<div class="week-modal-backdrop" id="weekModalBackdrop" onclick="closeWeekModal(event)">
+  <div class="week-modal">
+    <button class="week-modal-close" onclick="closeWeekModal()">&#10005;</button>
+    <div class="week-modal-header">
+      <h2 id="weekModalTitle"></h2>
+      <p id="weekModalSubtitle"></p>
+    </div>
+    <div class="week-modal-body" id="weekModalBody"></div>
+  </div>
+</div>
+
 <!-- PIN -->
-<div class="overlay-backdrop" id="pinOverlay" tabindex="-1">
+<div class="overlay-backdrop" id="pinOverlay">
   <div class="pin-modal">
-    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;" type="text" inputmode="none">
     <h3>Admin Access</h3>
     <p>Enter PIN to manage bookings</p>
     <div class="pin-dots">
@@ -925,18 +954,12 @@ async function delBooking(id) {
 }
 
 // PIN
-function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; document.getElementById("pinOverlay").classList.add("open"); setTimeout(()=>document.getElementById("pinFocusTrap").focus(),50); }
+function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; document.getElementById("pinOverlay").classList.add("open"); }
 function closePinOverlay() { document.getElementById("pinOverlay").classList.remove("open"); }
 function updateDots() { for(let i=0;i<4;i++) document.getElementById("pd"+i).classList.toggle("filled",i<pinBuffer.length); }
 function pinPress(d) { if(pinBuffer.length>=4)return; pinBuffer+=d; updateDots(); if(pinBuffer.length===4)setTimeout(checkPin,150); }
 function pinClear() { pinBuffer=""; updateDots(); }
 function pinBack()  { pinBuffer=pinBuffer.slice(0,-1); updateDots(); }
-window.addEventListener("keydown", function(e) {
-  if (!document.getElementById("pinOverlay").classList.contains("open")) return;
-  if (e.key >= "0" && e.key <= "9") { e.preventDefault(); pinPress(e.key); }
-  else if (e.key === "Backspace") { e.preventDefault(); pinBack(); }
-  else if (e.key === "Escape") { e.preventDefault(); closePinOverlay(); }
-});
 function checkPin() {
   const now = Date.now();
   if (now < pinLockedUntil) {
@@ -986,9 +1009,9 @@ function renderAdminPanel(showForm) {
         <div id="abCustomTimeFields" style="display:none;margin-top:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div><label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">Start time</label>
-              <select id="abStartTime" onchange="updateAdminHalfNote()"><option value="07:00">7:00am</option><option value="07:30">7:30am</option><option value="08:00">8:00am</option><option value="08:30">8:30am</option><option value="09:00">9:00am</option><option value="09:30">9:30am</option><option value="10:00">10:00am</option><option value="10:30">10:30am</option><option value="11:00">11:00am</option><option value="11:30">11:30am</option><option value="12:00">12:00pm</option><option value="12:30">12:30pm</option><option value="13:00">1:00pm</option><option value="13:30">1:30pm</option><option value="14:00">2:00pm</option><option value="14:30">2:30pm</option><option value="15:00">3:00pm</option><option value="15:30">3:30pm</option><option value="16:00">4:00pm</option><option value="16:30">4:30pm</option><option value="17:00">5:00pm</option><option value="17:30">5:30pm</option><option value="18:00">6:00pm</option><option value="18:30">6:30pm</option><option value="19:00">7:00pm</option><option value="19:30">7:30pm</option><option value="20:00">8:00pm</option><option value="20:30">8:30pm</option><option value="21:00">9:00pm</option><option value="21:30">9:30pm</option><option value="22:00">10:00pm</option></select></div>
+              <select id="abStartTime" onchange="updateAdminHalfNote()"><option value="07:00">7:00am</option><option value="07:15">7:15am</option><option value="07:30">7:30am</option><option value="07:45">7:45am</option><option value="08:00">8:00am</option><option value="08:15">8:15am</option><option value="08:30">8:30am</option><option value="08:45">8:45am</option><option value="09:00">9:00am</option><option value="09:15">9:15am</option><option value="09:30">9:30am</option><option value="09:45">9:45am</option><option value="10:00">10:00am</option><option value="10:15">10:15am</option><option value="10:30">10:30am</option><option value="10:45">10:45am</option><option value="11:00">11:00am</option><option value="11:15">11:15am</option><option value="11:30">11:30am</option><option value="11:45">11:45am</option><option value="12:00">12:00pm</option><option value="12:15">12:15pm</option><option value="12:30">12:30pm</option><option value="12:45">12:45pm</option><option value="13:00">1:00pm</option><option value="13:15">1:15pm</option><option value="13:30">1:30pm</option><option value="13:45">1:45pm</option><option value="14:00">2:00pm</option><option value="14:15">2:15pm</option><option value="14:30">2:30pm</option><option value="14:45">2:45pm</option><option value="15:00">3:00pm</option><option value="15:15">3:15pm</option><option value="15:30">3:30pm</option><option value="15:45">3:45pm</option><option value="16:00">4:00pm</option><option value="16:15">4:15pm</option><option value="16:30">4:30pm</option><option value="16:45">4:45pm</option><option value="17:00">5:00pm</option><option value="17:15">5:15pm</option><option value="17:30">5:30pm</option><option value="17:45">5:45pm</option><option value="18:00">6:00pm</option><option value="18:15">6:15pm</option><option value="18:30">6:30pm</option><option value="18:45">6:45pm</option><option value="19:00">7:00pm</option><option value="19:15">7:15pm</option><option value="19:30">7:30pm</option><option value="19:45">7:45pm</option><option value="20:00">8:00pm</option><option value="20:15">8:15pm</option><option value="20:30">8:30pm</option><option value="20:45">8:45pm</option><option value="21:00">9:00pm</option><option value="21:15">9:15pm</option><option value="21:30">9:30pm</option><option value="21:45">9:45pm</option><option value="22:00">10:00pm</option></select></div>
             <div><label style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:4px;">End time</label>
-              <select id="abEndTime"><option value="07:00">7:00am</option><option value="07:30">7:30am</option><option value="08:00">8:00am</option><option value="08:30">8:30am</option><option value="09:00">9:00am</option><option value="09:30">9:30am</option><option value="10:00">10:00am</option><option value="10:30">10:30am</option><option value="11:00">11:00am</option><option value="11:30">11:30am</option><option value="12:00">12:00pm</option><option value="12:30">12:30pm</option><option value="13:00">1:00pm</option><option value="13:30">1:30pm</option><option value="14:00">2:00pm</option><option value="14:30">2:30pm</option><option value="15:00">3:00pm</option><option value="15:30">3:30pm</option><option value="16:00">4:00pm</option><option value="16:30">4:30pm</option><option value="17:00">5:00pm</option><option value="17:30">5:30pm</option><option value="18:00">6:00pm</option><option value="18:30">6:30pm</option><option value="19:00">7:00pm</option><option value="19:30">7:30pm</option><option value="20:00">8:00pm</option><option value="20:30">8:30pm</option><option value="21:00">9:00pm</option><option value="21:30">9:30pm</option><option value="22:00">10:00pm</option></select></div>
+              <select id="abEndTime"><option value="07:00">7:00am</option><option value="07:15">7:15am</option><option value="07:30">7:30am</option><option value="07:45">7:45am</option><option value="08:00">8:00am</option><option value="08:15">8:15am</option><option value="08:30">8:30am</option><option value="08:45">8:45am</option><option value="09:00">9:00am</option><option value="09:15">9:15am</option><option value="09:30">9:30am</option><option value="09:45">9:45am</option><option value="10:00">10:00am</option><option value="10:15">10:15am</option><option value="10:30">10:30am</option><option value="10:45">10:45am</option><option value="11:00">11:00am</option><option value="11:15">11:15am</option><option value="11:30">11:30am</option><option value="11:45">11:45am</option><option value="12:00">12:00pm</option><option value="12:15">12:15pm</option><option value="12:30">12:30pm</option><option value="12:45">12:45pm</option><option value="13:00">1:00pm</option><option value="13:15">1:15pm</option><option value="13:30">1:30pm</option><option value="13:45">1:45pm</option><option value="14:00">2:00pm</option><option value="14:15">2:15pm</option><option value="14:30">2:30pm</option><option value="14:45">2:45pm</option><option value="15:00">3:00pm</option><option value="15:15">3:15pm</option><option value="15:30">3:30pm</option><option value="15:45">3:45pm</option><option value="16:00">4:00pm</option><option value="16:15">4:15pm</option><option value="16:30">4:30pm</option><option value="16:45">4:45pm</option><option value="17:00">5:00pm</option><option value="17:15">5:15pm</option><option value="17:30">5:30pm</option><option value="17:45">5:45pm</option><option value="18:00">6:00pm</option><option value="18:15">6:15pm</option><option value="18:30">6:30pm</option><option value="18:45">6:45pm</option><option value="19:00">7:00pm</option><option value="19:15">7:15pm</option><option value="19:30">7:30pm</option><option value="19:45">7:45pm</option><option value="20:00">8:00pm</option><option value="20:15">8:15pm</option><option value="20:30">8:30pm</option><option value="20:45">8:45pm</option><option value="21:00">9:00pm</option><option value="21:15">9:15pm</option><option value="21:30">9:30pm</option><option value="21:45">9:45pm</option><option value="22:00">10:00pm</option></select></div>
           </div>
         </div>
       </div>
@@ -1210,7 +1233,7 @@ function openSummaryPin() {
   pinBuffer = "";
   updateDots();
   document.getElementById("pinError").textContent = "";
-  const ov2=document.getElementById("pinOverlay"); ov2.classList.add("open"); setTimeout(()=>document.getElementById("pinFocusTrap").focus(),50);
+  document.getElementById("pinOverlay").classList.add("open");
 }
 
 let summaryUnlocked = false;
@@ -1408,6 +1431,78 @@ setInterval(() => {
 window.addEventListener("beforeunload", (e) => {
   if (activeSlot && activeForm) { e.preventDefault(); e.returnValue = ""; }
 });
+
+// ── WEEK BOOKINGS MODAL ──────────────────────────────────────────
+function formatTime12(t) {
+  if (!t) return "";
+  const [h,m] = t.split(":").map(Number);
+  return (h%12||12) + ":" + String(m).padStart(2,"0") + (h<12?"am":"pm");
+}
+
+function openWeekModal(which) {
+  const weekStart = which==="next" ? addDays(getWeekStart(todayStr),7) : getWeekStart(todayStr);
+  const weekEnd   = addDays(weekStart, 6);
+  const DAYS_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MON_S     = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  document.getElementById("weekModalTitle").textContent = which==="next" ? "Next Week's Bookings" : "This Week's Bookings";
+  const [sy,sm,sd] = weekStart.split("-").map(Number);
+  const [ey,em,ed] = weekEnd.split("-").map(Number);
+  document.getElementById("weekModalSubtitle").textContent =
+    sd+" "+MON_S[sm-1]+" – "+ed+" "+MON_S[em-1]+" "+ey;
+
+  const days = Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const weekBookings = bookings
+    .filter(b => b.status==="approved" && b.date>=weekStart && b.date<=weekEnd)
+    .sort((a,b)=>a.date.localeCompare(b.date)||a.slot.localeCompare(b.slot));
+
+  const body = document.getElementById("weekModalBody");
+  body.innerHTML = "";
+
+  if (!weekBookings.length) {
+    body.innerHTML = "<div class='week-booking-empty'>No approved bookings this week.</div>";
+  } else {
+    days.forEach(ds => {
+      const dayBookings = weekBookings.filter(b=>b.date===ds);
+      if (!dayBookings.length) return;
+      const [y,m,d] = ds.split("-").map(Number);
+      const dayName = DAYS_FULL[new Date(y,m-1,d).getDay()];
+      const hdr = document.createElement("div");
+      hdr.className = "week-modal-day-hdr";
+      hdr.textContent = dayName+", "+d+" "+MON_S[m-1].toUpperCase();
+      body.appendChild(hdr);
+      dayBookings.forEach(b => {
+        const isMatch = b.bookingType==="match";
+        const timeStr = b.slotEnd
+          ? formatTime12(b.slot)+" – "+formatTime12(b.slotEnd)
+          : slotLabel(b.slot);
+        const card = document.createElement("div");
+        card.className = "week-booking-card";
+        card.innerHTML =
+          "<div class='week-booking-card-left'>"+
+            "<div class='week-booking-card-title'>"+
+              "<span>"+b.team+"</span>"+
+              "<span style='font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:"+
+                (isMatch?"var(--red-pale)":"rgba(0,0,0,0.06)")+";color:"+
+                (isMatch?"var(--red)":"var(--text2)")+"'>"+
+                (isMatch?"Match":"Training")+
+              "</span>"+
+            "</div>"+
+            "<div class='week-booking-card-detail'>"+timeStr+" &middot; "+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</div>"+
+          "</div>"+
+          "<span style='font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1.5px solid var(--green);color:var(--green);white-space:nowrap;'>Approved</span>";
+        body.appendChild(card);
+      });
+    });
+  }
+  document.getElementById("weekModalBackdrop").classList.add("open");
+}
+
+function closeWeekModal(e) {
+  if (e && e.target!==document.getElementById("weekModalBackdrop")) return;
+  document.getElementById("weekModalBackdrop").classList.remove("open");
+}
+
 </script>
 </body>
 </html>
