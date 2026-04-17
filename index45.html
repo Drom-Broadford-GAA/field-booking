@@ -696,14 +696,9 @@ function renderDayView() {
         const booked = halvesBooked(activeDate, slot.start, pitch);
         const badge = document.createElement("span");
         if (pitch === "Tullylease" && activeDate === todayStr) return;
-        if (pitch === "Dromcollogher") {
-          if (booked >= 2) { badge.className = "pitch-badge full"; badge.innerHTML = "&#9632; "+pitch+": Full"; }
-          else { badge.className = "pitch-badge available"; badge.innerHTML = "&#10003; "+pitch+": Available (full pitch)"; }
-        } else {
-          if (booked >= 2) { badge.className = "pitch-badge full"; badge.innerHTML = "&#9632; "+pitch+": Full"; }
+        if (booked >= 2) { badge.className = "pitch-badge full"; badge.innerHTML = "&#9632; "+pitch+": Full"; }
           else if (booked === 1) { badge.className = "pitch-badge half"; badge.innerHTML = "&#9640; "+pitch+": 1 half left"; }
           else { badge.className = "pitch-badge available"; badge.innerHTML = "&#10003; "+pitch+": Available"; }
-        }
         avail.appendChild(badge);
       });
       cCol.appendChild(avail);
@@ -826,18 +821,8 @@ function updateHalfAvail() {
   const halfLabel = document.getElementById("halfLabel");
   if (!pitchEl || !halfSelector) return;
   const pitch = pitchEl.value;
-  if (pitch === "Dromcollogher") {
-    halfSelector.style.display = "none";
-    if (halfLabel) halfLabel.textContent = "Full pitch only";
-    selectedHalf = "full";
-    const fullOpt = document.getElementById("halfFull");
-    const halfOpt = document.getElementById("halfHalf");
-    if (fullOpt) { fullOpt.classList.add("selected"); fullOpt.classList.remove("disabled"); }
-    if (halfOpt) halfOpt.classList.remove("selected");
-  } else {
-    halfSelector.style.display = "grid";
-    if (halfLabel) halfLabel.textContent = "";
-  }
+  halfSelector.style.display = "grid";
+  if (halfLabel) halfLabel.textContent = "";
 }
 
 function updateHalfNote() {
@@ -890,7 +875,6 @@ async function submitBooking(slotStart, slotEnd) {
   const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRx.test(email)) { alert("Please enter a valid email address."); document.getElementById("fEmail").focus(); return; }
 
-  if (pitch === "Dromcollogher") { selectedHalf = "full"; }
   const dupCheck = bookings.find(b => b.date===activeDate && b.slot===slotStart && b.pitch===pitch && b.team===team && (b.status==="pending"||b.status==="approved"));
   if (dupCheck) { alert("A booking for " + team + " at " + pitch + " in this slot already exists. Please contact admin if you need to make changes."); return; }
   const booked = halvesBooked(activeDate, slotStart, pitch);
