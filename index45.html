@@ -1126,17 +1126,6 @@ function updateAdminHalfNote() {
   const halfSel = document.getElementById("abHalfSelector");
   if (!pitchEl || !note || !dateEl) return;
   const pitch = pitchEl.value;
-  if (pitch === "Dromcollogher") {
-    if (halfSel) halfSel.style.display = "none";
-    note.textContent = "Dromcollogher: full pitch only";
-    note.style.color = "var(--text3)";
-    adminBookHalf = "full";
-    const fullBtn = document.getElementById("abHalfFull");
-    const halfBtn = document.getElementById("abHalfHalf");
-    if (fullBtn) { fullBtn.classList.add("selected"); fullBtn.classList.remove("disabled"); }
-    if (halfBtn) { halfBtn.classList.remove("selected"); }
-    return;
-  }
   if (halfSel) halfSel.style.display = "flex";
   if (!dateEl || !dateEl.value || !slotEl || !slotEl.value) { note.textContent = ""; return; }
   const booked = halvesBooked(dateEl.value, slotEl.value, pitch);
@@ -1168,7 +1157,6 @@ async function submitAdminBooking() {
     const endEl   = document.getElementById("abEndTime");
     if (startEl && endEl && startEl.value >= endEl.value) { alert("End time must be after start time."); return; }
   }
-  if (pitch==="Dromcollogher") adminBookHalf="full";
   const booked = halvesBooked(date, slot, pitch);
   const halfLeft = 2 - booked;
   if (adminBookHalf==="full" && halfLeft<2) { alert("Full pitch not available. Only "+halfLeft+" half(s) remaining."); return; }
