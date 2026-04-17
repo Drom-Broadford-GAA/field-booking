@@ -920,12 +920,18 @@ async function delBooking(id) {
 }
 
 // PIN
-function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; document.getElementById("pinOverlay").classList.add("open"); }
+function openPinOverlay() { pinBuffer=""; updateDots(); document.getElementById("pinError").textContent=""; document.getElementById("pinOverlay").classList.add("open"); setTimeout(()=>document.getElementById("pinFocusTrap").focus(),50); }
 function closePinOverlay() { document.getElementById("pinOverlay").classList.remove("open"); }
 function updateDots() { for(let i=0;i<4;i++) document.getElementById("pd"+i).classList.toggle("filled",i<pinBuffer.length); }
 function pinPress(d) { if(pinBuffer.length>=4)return; pinBuffer+=d; updateDots(); if(pinBuffer.length===4)setTimeout(checkPin,150); }
 function pinClear() { pinBuffer=""; updateDots(); }
 function pinBack()  { pinBuffer=pinBuffer.slice(0,-1); updateDots(); }
+window.addEventListener("keydown", function(e) {
+  if (!document.getElementById("pinOverlay").classList.contains("open")) return;
+  if (e.key >= "0" && e.key <= "9") { e.preventDefault(); pinPress(e.key); }
+  else if (e.key === "Backspace") { e.preventDefault(); pinBack(); }
+  else if (e.key === "Escape") { e.preventDefault(); document.getElementById("pinOverlay").classList.remove("open"); }
+});
 function checkPin() {
   const now = Date.now();
   if (now < pinLockedUntil) {
@@ -1588,6 +1594,7 @@ window.addEventListener("beforeunload", (e) => {
 <!-- PIN OVERLAY -->
 <div class="overlay-backdrop" id="pinOverlay">
   <div class="pin-modal">
+    <input id="pinFocusTrap" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;" type="text" inputmode="none">
     <div class="pin-modal-title" id="pinTitle">Admin Access</div>
     <div class="pin-dots">
       <div class="pin-dot" id="pd0"></div>
