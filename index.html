@@ -19,7 +19,16 @@
   --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.13);
   --shadow:0 2px 12px rgba(0,0,0,0.08); --shadow-lg:0 8px 32px rgba(0,0,0,0.14);
   --green:#2d7a45; --green-light:#3a9658;
+  --drom:#0e7a6e; --drom-light:#12a090; --drom-pale:#e8f8f6; --drom-soft:#b2e6e0;
+  --tull:#6b3fa0; --tull-light:#8b5cc0; --tull-pale:#f3eeff; --tull-soft:#d4b8f5;
 }
+
+/* PITCH CHIPS */
+.pitch-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.04em;vertical-align:middle;white-space:nowrap;}
+.pitch-chip.drom{background:var(--drom-pale);color:var(--drom);border:1px solid var(--drom-soft);}
+.pitch-chip.tull{background:var(--tull-pale);color:var(--tull);border:1px solid var(--tull-soft);}
+.pitch-chip.drom::before{content:'🟢';font-size:8px;}
+.pitch-chip.tull::before{content:'🟣';font-size:8px;}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Outfit',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--cream2);}::-webkit-scrollbar-thumb{background:var(--cream3);border-radius:3px;}
@@ -452,6 +461,13 @@ header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;ba
 let selectedBookingType = "Training";
 let adminBookingType = "Training";
 
+// Returns an HTML pitch chip for a given pitch name
+function pitchChip(pitch) {
+  if (pitch === "Dromcollogher") return "<span class='pitch-chip drom'>Dromcollogher</span>";
+  if (pitch === "Tullylease")    return "<span class='pitch-chip tull'>Tullylease</span>";
+  return "<span class='pitch-chip'>"+pitch+"</span>";
+}
+
 function selectBookingType(type) {
   selectedBookingType = type;
   var t=document.getElementById("typeTraining");
@@ -700,7 +716,7 @@ function renderDayView() {
       const typeBdg=b.bookingType==='Match'
         ? "<span style='font-size:11px;font-weight:700;color:#c0182a;background:#fdf0f2;border:1px solid #f8d7db;border-radius:20px;padding:2px 8px;'>Match</span>"
         : "<span style='font-size:11px;font-weight:700;color:#156082;background:#e8f4fa;border:1px solid #bee3f0;border-radius:20px;padding:2px 8px;'>Training</span>";
-      card.innerHTML="<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong>"+typeBdg+"<span style='opacity:.6;font-size:11px;'>"+b.pitch+" &middot; "+(b.half==="full"?"Full pitch":"Half pitch")+"</span><span style='font-size:11px;color:var(--text3);'>"+fmt12(b.slot)+(b.slotEnd?" – "+fmt12(b.slotEnd):"")+"</span>"+bdg+"</span>";
+      card.innerHTML="<span style='display:flex;align-items:center;flex-wrap:wrap;gap:6px;'><strong>"+b.team+"</strong>"+typeBdg+pitchChip(b.pitch)+"<span style='opacity:.6;font-size:11px;'>"+(b.half==="full"?"Full pitch":"Half pitch")+"</span><span style='font-size:11px;color:var(--text3);'>"+fmt12(b.slot)+(b.slotEnd?" – "+fmt12(b.slotEnd):"")+"</span>"+bdg+"</span>";
       sec.appendChild(card);
     });
     scr.appendChild(sec);
@@ -712,8 +728,10 @@ function renderDayView() {
     PITCHES.forEach(pitch=>{
       
       const pb=dBks.filter(b=>b.pitch===pitch);
-      const bdg=document.createElement("span"); bdg.className=pb.length===0?"pitch-badge available":"pitch-badge half";
-      bdg.textContent=pb.length===0?"✓ "+pitch:"◑ "+pitch+": "+pb.length+" booking"+(pb.length>1?"s":"");
+      const cls = pitch==="Dromcollogher" ? "drom" : pitch==="Tullylease" ? "tull" : "";
+      const bdg=document.createElement("span");
+      bdg.className="pitch-badge "+(pb.length===0?"available":"half");
+      bdg.innerHTML=(pb.length===0?"✓ ":"◑ ")+pitchChip(pitch)+(pb.length>0 ? "<span style='margin-left:3px;'>"+pb.length+" booking"+(pb.length>1?"s":"")+"</span>" : "");
       avRow.appendChild(bdg);
     });
     avSec.appendChild(avRow); scr.appendChild(avSec);
@@ -1044,7 +1062,7 @@ function renderAdminPanel(showForm) {
           <div class="abr-date">${dateLabel(b.date)}</div>
         </div>
         <div class="abr-meta">
-          Coach: ${b.coach} &nbsp;&middot;&nbsp; ${b.pitch} &nbsp;&middot;&nbsp; ${b.bookingType?b.bookingType+" &nbsp;&middot;&nbsp; ":""}${b.half==="full"?"Full pitch":"Half pitch"} &nbsp;&middot;&nbsp; ${slotLabel(b.slot)}
+          Coach: ${b.coach} &nbsp;&middot;&nbsp; ${pitchChip(b.pitch)} &nbsp;&middot;&nbsp; ${b.bookingType?b.bookingType+" &nbsp;&middot;&nbsp; ":""}${b.half==="full"?"Full pitch":"Half pitch"} &nbsp;&middot;&nbsp; ${slotLabel(b.slot)}
           <br>Email: ${b.email||"-"}
         </div>
         <div class="abr-actions">
@@ -1277,11 +1295,14 @@ function renderWeekView() {
           row.className = "week-pitch-row";
           const dot = document.createElement("span");
           dot.className = "week-avail-dot";
-          dot.style.background = booked>=2 ? "var(--red)" : booked===1 ? "var(--amber2)" : "var(--green)";
-          if (pitch==="Dromcollogher") dot.style.background = booked>=2 ? "var(--red)" : "var(--green)";
+          dot.style.background = booked>=2 ? "var(--red)" : booked===1 ? "var(--amber2)" : (pitch==="Dromcollogher" ? "var(--drom)" : pitch==="Tullylease" ? "var(--tull)" : "var(--green)");
+          if (pitch==="Dromcollogher") dot.style.background = booked>=2 ? "var(--red)" : booked===1 ? "var(--amber2)" : "var(--drom)";
+          if (pitch==="Tullylease")    dot.style.background = booked>=2 ? "var(--red)" : booked===1 ? "var(--amber2)" : "var(--tull)";
           row.appendChild(dot);
           const lbl = document.createElement("span");
           lbl.className = "week-pitch-label";
+          lbl.style.color = pitch==="Dromcollogher" ? "var(--drom)" : pitch==="Tullylease" ? "var(--tull)" : "";
+          lbl.style.fontWeight = "700";
           lbl.textContent = pitch==="Dromcollogher" ? "Drom" : pitch==="Tullylease" ? "Tull" : "Hazl";
           row.appendChild(lbl);
           cell.appendChild(row);
@@ -1332,7 +1353,7 @@ function renderSummary() {
     tr.innerHTML =
       "<td style='font-weight:600;white-space:nowrap;'>"+dateLabel(b.date)+"</td>" +
       "<td style='white-space:nowrap;'>"+slotLabel(b.slot)+"</td>" +
-      "<td>"+b.pitch+"</td>" +
+      "<td>"+pitchChip(b.pitch)+"</td>" +
       "<td><span style='font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:"+(b.half==="full"?"var(--red-pale)":"var(--amber-pale)")+";color:"+(b.half==="full"?"var(--red)":"var(--amber)")+"'>"+( b.half==="full"?"Full":"Half")+"</span></td>" +
       "<td style='font-weight:500;'>"+b.team+"</td>" +
       "<td>"+b.coach+"</td>" +
